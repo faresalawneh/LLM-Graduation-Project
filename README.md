@@ -1,5 +1,3 @@
-Done. Here is the concise Quick Start Guide in English for your private repository:
-
 🚀 Quick Start Guide
 1. Run Local Stack
 Navigate to the project root where docker-compose.yml is located and run:
