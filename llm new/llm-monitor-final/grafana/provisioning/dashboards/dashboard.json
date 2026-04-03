@@ -1,0 +1,30 @@
+{
+  "title": "LLM Inference Observability",
+  "panels": [
+    {
+      "title": "TTFT (ms)",
+      "targets": [{ "expr": "ttft_ms", "legendFormat": "TTFT" }],
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "type": "graph"
+    },
+    {
+      "title": "Throughput (tokens/s)",
+      "targets": [{ "expr": "throughput_tokens_per_sec", "legendFormat": "Throughput" }],
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 },
+      "type": "graph"
+    },
+    {
+      "title": "GPU Utilization (%)",
+      "targets": [{ "expr": "DCGM_FI_DEV_GPU_UTIL", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "type": "graph"
+    },
+    {
+      "title": "GPU Memory Used (MiB)",
+      "targets": [{ "expr": "DCGM_FI_DEV_MEMORY_USED", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "type": "graph"
+    }
+  ],
+  "schemaVersion": 27
+}
