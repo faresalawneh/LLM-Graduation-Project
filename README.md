@@ -1,39 +1,34 @@
-🚀 Quick Start Guide
-1. Run Local Stack
-Navigate to the project root where docker-compose.yml is located and run:
+**1. Install Docker + NVIDIA Container Toolkit**
+```bash
+# Docker
+curl -fsSL https://get.docker.com | sh
 
-Bash
-docker-compose up -d
-Grafana: http://localhost:3000 (Default: admin/admin)
+# NVIDIA Container Toolkit (for GPU access in Docker)
+# Follow: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+```
 
-Pushgateway: http://localhost:9091
+**2. Copy your project folder to the server** (USB, git clone, or drag-and-drop via Remote Desktop)
 
-2. Establish Data Tunnel (ngrok)
-Open your terminal and start a tunnel to the Pushgateway port:
+**3. Install vLLM + AIPerf**
+```bash
+pip install vllm aiperf
+```
 
-Bash
-ngrok http 9091
-⚠️ Copy the "Forwarding" URL (e.g., https://xxxx.ngrok-free.dev).
+**4. Start the monitoring stack**
+```bash
+cd your-project-folder
+docker compose up -d
+```
 
-3. Execute Benchmark (Google Colab)
-Open the provided Notebook in Google Colab.
+**5. Serve the model**
+```bash
+vllm serve facebook/opt-125m --port 8000
+```
 
-Upload BurstGPT_without_fails_3.csv to the /content/ directory.
+**6. Run AIPerf benchmark** — point it at `localhost:8000`, push metrics to `localhost:9091`
 
-Replace the NGROK_URL variable in the code with your copied ngrok URL.
+**7. Open Grafana** at `localhost:3000` in the server's browser
 
-Run the vLLM Server cell first, then run the Benchmark/Stress Test cell.
+**8. Later — add DCGM Exporter** to compose file, update prometheus target, `docker compose up -d` again
 
-4. Setup Grafana Dashboard
-Add Data Source: Select Prometheus and set the URL to http://prometheus:9090.
-
-Import Dashboard: Go to Dashboards -> Import and upload the dashboard.json file included in this repo.
-
-📂 Required Repository Files:
-Ensure the following files are in the root directory for this guide to work:
-
-docker-compose.yml
-
-prometheus.yml
-
-demo.ipynb
+That's it. No ngrok, no tunnels, everything talks over localhost.
