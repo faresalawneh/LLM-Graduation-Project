@@ -16,8 +16,8 @@ pip install vllm aiperf
 
 **4. Start the monitoring stack**
 ```bash
-cd your-project-folder
 docker compose up -d
+docker-compose ps
 ```
 
 **5. Serve the model**
