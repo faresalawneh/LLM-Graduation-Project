@@ -30,7 +30,7 @@ VLLM_MODEL          = "facebook/opt-125m"
 VLLM_PORT           = 8000
 
 # Path to BurstGPT CSV on the server
-BURSTGPT_CSV_PATH   = Path("/home/youruser/data/BurstGPT_without_fails_3.csv")  # CHANGE
+BURSTGPT_CSV_PATH   = Path("C:\llm-observability\monitoring\BurstGPT_without_fails_3.csv")  # CHANGE
 
 # Windows machine IP on university network (run: ipconfig → IPv4)
 PUSHGATEWAY_URL     = "http://CHANGE_ME:9091"
