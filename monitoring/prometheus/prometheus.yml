@@ -14,6 +14,13 @@ scrape_configs:
   # CHANGE: replace with actual server IP
   - job_name: 'dcgm_exporter'
     static_configs:
-      - targets: ['CHANGE_ME:9400']   # e.g. '10.0.0.5:9400'
+      - targets: ['10.242.237.172:9400']   # e.g. '10.0.0.5:9400'
     metrics_path: /metrics
     scrape_interval: 10s
+
+  # vLLM OpenAI-compatible server metrics
+  - job_name: 'vllm'
+    static_configs:
+      - targets: ['10.242.237.172:8000']
+    metrics_path: /metrics
+    scrape_interval: 15s
