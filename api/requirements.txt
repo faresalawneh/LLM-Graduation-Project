@@ -1,0 +1,5 @@
+flask
+requests
+pytest
+pytest-flask
+bandit
