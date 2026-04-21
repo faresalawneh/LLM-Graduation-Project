@@ -39,6 +39,24 @@ services:
     depends_on:
       - prometheus
 
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.0-3.2.0-ubuntu20.04
+    container_name: dcgm-exporter
+    restart: unless-stopped
+    cap_add:
+      - SYS_ADMIN
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "9400:9400"
+    networks:
+      - monitoring
+
 networks:
   monitoring:
     driver: bridge
