@@ -21,7 +21,7 @@
     },
     {
       "title": "GPU Memory Used (MiB)",
-      "targets": [{ "expr": "DCGM_FI_DEV_MEMORY_USED", "legendFormat": "GPU {{gpu}}" }],
+      "targets": [{ "expr": "DCGM_FI_DEV_FB_USED", "legendFormat": "GPU {{gpu}}" }],
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
       "type": "graph"
     }
