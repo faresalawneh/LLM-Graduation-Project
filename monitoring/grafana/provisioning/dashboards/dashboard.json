@@ -3,15 +3,49 @@
   "panels": [
     {
       "title": "TTFT (ms)",
-      "targets": [{ "expr": "ttft_ms", "legendFormat": "TTFT" }],
+      "targets": [{ "expr": "ttft_ms", "legendFormat": "{{scenario}}" }],
       "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
-      "type": "graph"
+      "type": "graph",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "steady" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "burst" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "stress" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#F2495C" } }]
+          }
+        ]
+      }
     },
     {
       "title": "Throughput (tokens/s)",
-      "targets": [{ "expr": "throughput_tokens_per_sec", "legendFormat": "Throughput" }],
+      "targets": [{ "expr": "throughput_tokens_per_sec", "legendFormat": "{{scenario}}" }],
       "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 },
-      "type": "graph"
+      "type": "graph",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "steady" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "burst" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "stress" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#F2495C" } }]
+          }
+        ]
+      }
     },
     {
       "title": "GPU Utilization (%)",
@@ -24,6 +58,20 @@
       "targets": [{ "expr": "DCGM_FI_DEV_FB_USED", "legendFormat": "GPU {{gpu}}" }],
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
       "type": "graph"
+    },
+    {
+      "title": "P95 Request Latency (ms)",
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(vllm:e2e_request_latency_seconds_bucket[1m])) by (le)) * 1000", "legendFormat": "P95 Latency" }],
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "title": "Queue Depth (Waiting Requests)",
+      "targets": [{ "expr": "vllm:num_requests_waiting", "legendFormat": "Queue Depth" }],
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "short" } }
     }
   ],
   "schemaVersion": 27

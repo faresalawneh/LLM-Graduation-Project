@@ -6,12 +6,17 @@ VLLM_MODEL = "facebook/opt-125m"
 VLLM_URL = "http://localhost:8000/v1/completions"
 PUSHGATEWAY_URL = "http://localhost:9091"
 BURSTGPT_CSV_PATH = Path("/media/works/BurstGPT_without_fails_3.csv")
-STEADY_DURATION_SEC = 420
-STEADY_RATE = 3
-BURST_N_REQUESTS = 500
+STEADY_DURATION_SEC = 900  # 15 minutes
+STEADY_RATE = 3  # req/s
+BURST_DURATION_SEC = 900
+BURST_COUNT = 5
+BURST_SIZE = 100  # requests per burst
+STRESS_DURATION_SEC = 180  # 3 minutes
+STRESS_MAX_CONCURRENT = 200
+STEADY_MAX_CONCURRENT = 50
+BURST_MAX_CONCURRENT = 100
 PAUSE_BETWEEN_SEC = 15
 MAX_MODEL_LEN = 512
-MAX_CONCURRENT = 50
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("benchmark")
@@ -97,32 +102,59 @@ async def run_steady(session, sem):
 
 async def run_burst(session, sem):
     logger.info("=== SCENARIO 2: BURST ===")
-    rows = load_rows(BURSTGPT_CSV_PATH, BURST_N_REQUESTS)
-    burst_size = BURST_N_REQUESTS // 5
-    pause_between = max((420 / 5) - (burst_size * 0.05), 1)
+    rows = load_rows(BURSTGPT_CSV_PATH)
+    pause_between = (BURST_DURATION_SEC - BURST_COUNT * BURST_SIZE * 0.05) / (BURST_COUNT - 1)
     idx = 0
-    for b in range(5):
-        logger.info("  Burst %d/5", b + 1)
+    for b in range(BURST_COUNT):
+        logger.info("  Burst %d/%d", b + 1, BURST_COUNT)
         tasks = []
-        for i in range(burst_size):
-            if idx >= len(rows):
-                break
-            req_tok, resp_tok = rows[idx]
+        for i in range(BURST_SIZE):
+            req_tok, resp_tok = rows[idx % len(rows)]
             tasks.append(asyncio.create_task(send_request(session, sem, req_tok, resp_tok, idx, "burst")))
             idx += 1
             await asyncio.sleep(0.05)
         await asyncio.gather(*tasks)
-        if b < 4:
+        if b < BURST_COUNT - 1:
+            logger.info("  Pause between bursts: %.2fs", pause_between)
             await asyncio.sleep(pause_between)
-    logger.info("=== BURST complete ===")
+    logger.info("=== BURST complete %d requests ===", idx)
+
+
+async def run_stress(session, sem):
+    logger.info("=== SCENARIO 3: STRESS ===")
+    rows = load_rows(BURSTGPT_CSV_PATH)
+    idx = 0
+    start = time.perf_counter()
+    tasks = []
+    while (time.perf_counter() - start) < STRESS_DURATION_SEC:
+        req_tok, resp_tok = rows[idx % len(rows)]
+        tasks.append(asyncio.create_task(send_request(session, sem, req_tok, resp_tok, idx, "stress")))
+        idx += 1
+    await asyncio.gather(*tasks)
+    logger.info("=== STRESS complete %d requests ===", idx)
 
 async def main():
-    sem = asyncio.Semaphore(MAX_CONCURRENT)
     async with aiohttp.ClientSession() as session:
-        await run_steady(session, sem)
+        # Scenario 1: Steady
+        sem_steady = asyncio.Semaphore(STEADY_MAX_CONCURRENT)
+        await run_steady(session, sem_steady)
+        
+        # Pause between scenarios
         logger.info("=== PAUSE %ds ===", PAUSE_BETWEEN_SEC)
         await asyncio.sleep(PAUSE_BETWEEN_SEC)
-        await run_burst(session, sem)
+        
+        # Scenario 2: Burst
+        sem_burst = asyncio.Semaphore(BURST_MAX_CONCURRENT)
+        await run_burst(session, sem_burst)
+        
+        # Pause between scenarios
+        logger.info("=== PAUSE %ds ===", PAUSE_BETWEEN_SEC)
+        await asyncio.sleep(PAUSE_BETWEEN_SEC)
+        
+        # Scenario 3: Stress
+        sem_stress = asyncio.Semaphore(STRESS_MAX_CONCURRENT)
+        await run_stress(session, sem_stress)
+    
     logger.info("=== ALL DONE ===")
 
 asyncio.run(main())
