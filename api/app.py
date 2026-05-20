@@ -1,17 +1,64 @@
-from flask import Flask, jsonify
-import requests
+"""LLM Observability API - FastAPI with JWT auth."""
+from typing import Annotated, Optional
 
-app = Flask(__name__)
+import requests
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
+
+from auth import (
+    Token,
+    User,
+    authenticate_user,
+    create_access_token,
+    get_current_user,
+)
 
 PROMETHEUS_URL = "http://localhost:9090"
 
+app = FastAPI(
+    title="LLM Observability API",
+    description="Real-time observability for vLLM inference serving on Tesla P40",
+    version="1.0.0",
+)
 
-def query_prometheus(promql):
+
+# ---------- Response models (for auto Swagger) ----------
+class HealthResponse(BaseModel):
+    status: str
+
+
+class ScenarioMetric(BaseModel):
+    steady: Optional[float] = None
+    burst: Optional[float] = None
+
+
+class MetricsSummary(BaseModel):
+    ttft_ms: ScenarioMetric
+    latency_ms: ScenarioMetric
+    throughput_tokens_per_sec: ScenarioMetric
+
+
+class GPUStats(BaseModel):
+    sm_clock_mhz: Optional[float] = None
+    memory_used_mib: Optional[float] = None
+    temperature_c: Optional[float] = None
+    power_w: Optional[float] = None
+
+
+class VLLMStats(BaseModel):
+    requests_waiting: Optional[float] = None
+    requests_running: Optional[float] = None
+    kv_cache_usage_pct: Optional[float] = None
+
+
+# ---------- Helper ----------
+def query_prometheus(promql: str) -> Optional[float]:
     try:
         resp = requests.get(
             f"{PROMETHEUS_URL}/api/v1/query",
             params={"query": promql},
-            timeout=5
+            timeout=5,
         )
         data = resp.json()
         if data["status"] == "success" and data["data"]["result"]:
@@ -21,54 +68,64 @@ def query_prometheus(promql):
         return None
 
 
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"})
+# ---------- Auth endpoint ----------
+@app.post("/auth/token", response_model=Token, tags=["auth"])
+async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = create_access_token({"sub": user["username"], "role": user["role"]})
+    return Token(access_token=token, token_type="bearer", role=user["role"])
 
 
-@app.route("/metrics/summary", methods=["GET"])
-def metrics_summary():
-    ttft_steady = query_prometheus('ttft_ms{scenario="steady"}')
-    ttft_burst = query_prometheus('ttft_ms{scenario="burst"}')
-    latency_steady = query_prometheus('request_latency_ms{scenario="steady"}')
-    latency_burst = query_prometheus('request_latency_ms{scenario="burst"}')
-    throughput_steady = query_prometheus('throughput_tokens_per_sec{scenario="steady"}')
-    throughput_burst = query_prometheus('throughput_tokens_per_sec{scenario="burst"}')
-
-    return jsonify({
-        "ttft_ms": {"steady": ttft_steady, "burst": ttft_burst},
-        "latency_ms": {"steady": latency_steady, "burst": latency_burst},
-        "throughput_tokens_per_sec": {"steady": throughput_steady, "burst": throughput_burst}
-    })
+# ---------- Public endpoint ----------
+@app.get("/health", response_model=HealthResponse, tags=["public"])
+async def health():
+    return HealthResponse(status="ok")
 
 
-@app.route("/gpu", methods=["GET"])
-def gpu():
-    sm_clock = query_prometheus("DCGM_FI_DEV_SM_CLOCK")
-    memory_used = query_prometheus("DCGM_FI_DEV_FB_USED")
-    temperature = query_prometheus("DCGM_FI_DEV_GPU_TEMP")
-    power = query_prometheus("DCGM_FI_DEV_POWER_USAGE")
+# ---------- Protected endpoints (any authenticated user) ----------
+@app.get("/metrics/summary", response_model=MetricsSummary, tags=["metrics"])
+async def metrics_summary(user: Annotated[User, Depends(get_current_user)]):
+    return MetricsSummary(
+        ttft_ms=ScenarioMetric(
+            steady=query_prometheus('ttft_ms{scenario="steady"}'),
+            burst=query_prometheus('ttft_ms{scenario="burst"}'),
+        ),
+        latency_ms=ScenarioMetric(
+            steady=query_prometheus('request_latency_ms{scenario="steady"}'),
+            burst=query_prometheus('request_latency_ms{scenario="burst"}'),
+        ),
+        throughput_tokens_per_sec=ScenarioMetric(
+            steady=query_prometheus('throughput_tokens_per_sec{scenario="steady"}'),
+            burst=query_prometheus('throughput_tokens_per_sec{scenario="burst"}'),
+        ),
+    )
 
-    return jsonify({
-        "sm_clock_mhz": sm_clock,
-        "memory_used_mib": memory_used,
-        "temperature_c": temperature,
-        "power_w": power
-    })
+
+@app.get("/gpu", response_model=GPUStats, tags=["metrics"])
+async def gpu(user: Annotated[User, Depends(get_current_user)]):
+    return GPUStats(
+        sm_clock_mhz=query_prometheus("DCGM_FI_DEV_SM_CLOCK"),
+        memory_used_mib=query_prometheus("DCGM_FI_DEV_FB_USED"),
+        temperature_c=query_prometheus("DCGM_FI_DEV_GPU_TEMP"),
+        power_w=query_prometheus("DCGM_FI_DEV_POWER_USAGE"),
+    )
 
 
-@app.route("/vllm", methods=["GET"])
-def vllm():
-    queue_depth = query_prometheus("vllm:num_requests_waiting")
-    running = query_prometheus("vllm:num_requests_running")
-    kv_cache = query_prometheus("vllm:gpu_cache_usage_perc")
-
-    return jsonify({
-        "requests_waiting": queue_depth,
-        "requests_running": running,
-        "kv_cache_usage_pct": kv_cache
-    })
+@app.get("/vllm", response_model=VLLMStats, tags=["metrics"])
+async def vllm(user: Annotated[User, Depends(get_current_user)]):
+    return VLLMStats(
+        requests_waiting=query_prometheus("vllm:num_requests_waiting"),
+        requests_running=query_prometheus("vllm:num_requests_running"),
+        kv_cache_usage_pct=query_prometheus("vllm:gpu_cache_usage_perc"),
+    )
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)  # nosec
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=5000)
