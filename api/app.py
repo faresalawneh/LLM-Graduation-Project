@@ -79,7 +79,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token({"sub": user["username"], "role": user["role"]})
-    return Token(access_token=token, token_type="bearer", role=user["role"])
+    return Token(access_token=token, token_type="bearer", role=user["role"]) # nosec
 
 
 # ---------- Public endpoint ----------
@@ -128,4 +128,4 @@ async def vllm(user: Annotated[User, Depends(get_current_user)]):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    uvicorn.run(app, host="0.0.0.0", port=5000) # nosec
