@@ -72,6 +72,37 @@
       "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
       "type": "timeseries",
       "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "title": "SM Clock (MHz)",
+      "targets": [{ "expr": "DCGM_FI_DEV_SM_CLOCK", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "type": "timeseries"
+    },
+    {
+      "title": "Power Usage (W)",
+      "targets": [{ "expr": "DCGM_FI_DEV_POWER_USAGE", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "type": "timeseries"
+    },
+    {
+      "title": "Running Requests",
+      "targets": [{ "expr": "vllm:num_requests_running", "legendFormat": "Running" }],
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 16 },
+      "type": "timeseries"
+    },
+    {
+      "title": "KV Cache Usage (%)",
+      "targets": [{ "expr": "vllm:gpu_cache_usage_perc * 100", "legendFormat": "KV Cache" }],
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 16 },
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "title": "GPU Temperature (°C)",
+      "targets": [{ "expr": "DCGM_FI_DEV_GPU_TEMP", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 16 },
+      "type": "timeseries"
     }
   ],
   "schemaVersion": 27

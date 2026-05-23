@@ -40,7 +40,7 @@ services:
       - prometheus
 
   dcgm-exporter:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.0-3.2.0-ubuntu20.04
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04
     container_name: dcgm-exporter
     restart: unless-stopped
     cap_add:
