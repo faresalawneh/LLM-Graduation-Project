@@ -112,7 +112,7 @@ def gpu_scrape_thread(stop, artifact_dir):
 
 # ── Single request sender ─────────────────────────────────────────────────────
 
-def send_request(row, scenario, results, lock, semaphore):
+def send_request(row, scenario, results, lock, semaphore, profile_path):
     prompt_tokens  = int(float(row.get("Request tokens", 50)))
     response_tokens = int(float(row.get("Response tokens", 100)))
     max_tokens     = min(response_tokens, MAX_TOKENS_CAP)
@@ -163,12 +163,15 @@ def send_request(row, scenario, results, lock, semaphore):
         push_metric("request_latency_ms", latency_ms, scenario)
         push_metric("throughput_tokens_per_sec", throughput, scenario)
 
+        record = {
+            "ttft_ms": ttft_ms,
+            "latency_ms": latency_ms,
+            "throughput_tokens_per_sec": throughput,
+        }
         with lock:
-            results.append({
-                "latency_ms": latency_ms,
-                "throughput": throughput,
-                "ttft_ms": ttft_ms,
-            })
+            results.append(record)
+            with profile_path.open("a") as pf:
+                pf.write(json.dumps(record) + "\n")
 
         log.info("[%s] ttft=%.1fms latency=%.1fms throughput=%.1f tok/s",
                  scenario, ttft_ms, latency_ms, throughput)
@@ -193,6 +196,9 @@ def run_scenario(scenario, bucket_id, artifact_dir):
     gpu_thread.start()
 
     semaphore = threading.Semaphore(MAX_CONCURRENCY)
+    profile_path = artifact_dir / "profile_export.jsonl"
+    if profile_path.exists():
+        profile_path.unlink()
     results = []
     lock    = threading.Lock()
     threads = []
@@ -211,7 +217,7 @@ def run_scenario(scenario, bucket_id, artifact_dir):
 
         t = threading.Thread(
             target=send_request,
-            args=(row, scenario, results, lock, semaphore),
+            args=(row, scenario, results, lock, semaphore, profile_path),
             daemon=True,
         )
         t.start()
