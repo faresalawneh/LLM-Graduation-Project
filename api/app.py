@@ -3,6 +3,7 @@ from typing import Annotated, Optional
 
 import requests
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
@@ -83,6 +84,11 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
 
 
 # ---------- Public endpoint ----------
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/docs")
+
+
 @app.get("/health", response_model=HealthResponse, tags=["public"])
 async def health():
     return HealthResponse(status="ok")
