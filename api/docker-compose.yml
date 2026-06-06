@@ -1,0 +1,7 @@
+services:
+  llm-api:
+    image: faresalawneh/llm-observability-api:latest
+    container_name: llm-api
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
