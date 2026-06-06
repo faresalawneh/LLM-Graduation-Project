@@ -52,6 +52,7 @@ def test_login_success(client):
     assert data["role"] == "admin"  # nosec B101
 
 
+
 def test_login_wrong_password(client):
     resp = client.post(
         "/auth/token",
