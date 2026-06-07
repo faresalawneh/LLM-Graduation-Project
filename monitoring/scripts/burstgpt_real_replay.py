@@ -127,24 +127,24 @@ def send_request(row, scenario, results, lock, semaphore, profile_path):
 
     with semaphore:
         t0 = time.perf_counter()
-    ttft_ms = None
-    output_tokens = 0
+        ttft_ms = None
+        output_tokens = 0
 
-    try:
-        with requests.post(VLLM_URL, json=payload, stream=True, timeout=120) as resp:
-            resp.raise_for_status()
-            for line in resp.iter_lines():
-                if not line:
-                    continue
-                line = line.decode("utf-8")
-                if line.startswith("data:"):
-                    line = line[5:].strip()
-                if line == "[DONE]":
-                    break
-                try:
-                    chunk = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+        try:
+            with requests.post(VLLM_URL, json=payload, stream=True, timeout=120) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    line = line.decode("utf-8")
+                    if line.startswith("data:"):
+                        line = line[5:].strip()
+                    if line == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
 
                 # First chunk received = first token = TTFT
                 if ttft_ms is None:
@@ -153,31 +153,31 @@ def send_request(row, scenario, results, lock, semaphore, profile_path):
                 token_text = chunk.get("choices", [{}])[0].get("text", "")
                 output_tokens += len(token_text.split())
 
-        t1 = time.perf_counter()
-        latency_ms = (t1 - t0) * 1000
-        duration   = t1 - t0
-        throughput = output_tokens / duration if duration > 0 else 0
-        ttft_ms    = ttft_ms if ttft_ms is not None else latency_ms
+            t1 = time.perf_counter()
+            latency_ms = (t1 - t0) * 1000
+            duration   = t1 - t0
+            throughput = output_tokens / duration if duration > 0 else 0
+            ttft_ms    = ttft_ms if ttft_ms is not None else latency_ms
 
-        push_metric("ttft_ms", ttft_ms, scenario)
-        push_metric("request_latency_ms", latency_ms, scenario)
-        push_metric("throughput_tokens_per_sec", throughput, scenario)
+            push_metric("ttft_ms", ttft_ms, scenario)
+            push_metric("request_latency_ms", latency_ms, scenario)
+            push_metric("throughput_tokens_per_sec", throughput, scenario)
 
-        record = {
-            "ttft_ms": ttft_ms,
-            "latency_ms": latency_ms,
-            "throughput_tokens_per_sec": throughput,
-        }
-        with lock:
-            results.append(record)
-            with profile_path.open("a") as pf:
-                pf.write(json.dumps(record) + "\n")
+            record = {
+                "ttft_ms": ttft_ms,
+                "latency_ms": latency_ms,
+                "throughput_tokens_per_sec": throughput,
+            }
+            with lock:
+                results.append(record)
+                with profile_path.open("a") as pf:
+                    pf.write(json.dumps(record) + "\n")
 
-        log.info("[%s] ttft=%.1fms latency=%.1fms throughput=%.1f tok/s",
-                 scenario, ttft_ms, latency_ms, throughput)
+            log.info("[%s] ttft=%.1fms latency=%.1fms throughput=%.1f tok/s",
+                    scenario, ttft_ms, latency_ms, throughput)
 
-    except Exception as e:
-        log.warning("[%s] request failed: %s", scenario, e)
+        except Exception as e:
+            log.warning("[%s] request failed: %s", scenario, e)
 
 
 # ── Scenario runner ───────────────────────────────────────────────────────────

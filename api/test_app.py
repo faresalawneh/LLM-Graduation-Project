@@ -168,6 +168,7 @@ def test_vllm_returns_expected_keys(client, auth_headers):
 
 
 
+
 # ---------- Helper ----------
 def test_query_prometheus_handles_exception():
     with patch("requests.get", side_effect=Exception("connection refused")):

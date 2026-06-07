@@ -17,6 +17,7 @@ from auth import (
 )
 
 
+
 PROMETHEUS_URL = "http://localhost:9090"
 
 app = FastAPI(
