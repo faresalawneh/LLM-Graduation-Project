@@ -13,6 +13,7 @@ from auth import (
     authenticate_user,
     create_access_token,
     get_current_user,
+    require_role,
 )
 
 PROMETHEUS_URL = "http://localhost:9090"
@@ -114,7 +115,7 @@ async def metrics_summary(user: Annotated[User, Depends(get_current_user)]):
 
 
 @app.get("/gpu", response_model=GPUStats, tags=["metrics"])
-async def gpu(user: Annotated[User, Depends(get_current_user)]):
+async def gpu(user: Annotated[User, Depends(require_role("admin"))]):
     return GPUStats(
         sm_clock_mhz=query_prometheus("DCGM_FI_DEV_SM_CLOCK"),
         memory_used_mib=query_prometheus("DCGM_FI_DEV_FB_USED"),
@@ -124,7 +125,7 @@ async def gpu(user: Annotated[User, Depends(get_current_user)]):
 
 
 @app.get("/vllm", response_model=VLLMStats, tags=["metrics"])
-async def vllm(user: Annotated[User, Depends(get_current_user)]):
+async def vllm(user: Annotated[User, Depends(require_role("admin"))]):
     return VLLMStats(
         requests_waiting=query_prometheus("vllm:num_requests_waiting"),
         requests_running=query_prometheus("vllm:num_requests_running"),

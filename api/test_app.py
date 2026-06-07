@@ -92,6 +92,30 @@ def test_viewer_can_access_metrics(client, viewer_token):
         assert resp.status_code == 200  # nosec B101
 
 
+def test_viewer_cannot_access_gpu(client, viewer_token):
+    with patch("app.query_prometheus", return_value=1200.0):
+        resp = client.get(
+            "/gpu",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert resp.status_code == 403  # nosec B101
+
+
+def test_viewer_cannot_access_vllm(client, viewer_token):
+    with patch("app.query_prometheus", return_value=5.0):
+        resp = client.get(
+            "/vllm",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert resp.status_code == 403  # nosec B101
+
+
+def test_admin_can_access_gpu(client, auth_headers):
+    with patch("app.query_prometheus", return_value=1200.0):
+        resp = client.get("/gpu", headers=auth_headers)
+        assert resp.status_code == 200  # nosec B101
+
+
 # ---------- Metrics summary ----------
 def test_metrics_summary_returns_expected_keys(client, auth_headers):
     with patch("app.query_prometheus", return_value=123.4):
