@@ -83,6 +83,7 @@ def test_protected_endpoint_bad_token(client):
     assert resp.status_code == 401  # nosec B101
 
 
+
 def test_viewer_can_access_metrics(client, viewer_token):
     with patch("app.query_prometheus", return_value=50.0):
         resp = client.get(
