@@ -50,3 +50,4 @@
 {"ttft_ms": 275.3110999474302, "latency_ms": 424.8352999566123, "throughput_tokens_per_sec": 9.415413456481872}
 {"ttft_ms": 291.0911999642849, "latency_ms": 569.3578999489546, "throughput_tokens_per_sec": 10.538186965593919}
 {"ttft_ms": 286.906799999997, "latency_ms": 2755.0027000252157, "throughput_tokens_per_sec": 15.60797018442357}
+{"ttft_ms": 394.19660007115453, "latency_ms": 5249.53390005976, "throughput_tokens_per_sec": 16.001420621180056}
