@@ -95,6 +95,41 @@ python aiperf_with_push.py
 python burstgpt_real_replay.py
 ```
 
+## Zero-config quick start
+
+```bash
+docker run -d -p 9090:9090 faresalawneh/llm-observability-prometheus:latest
+docker run -d -p 9091:9091 faresalawneh/llm-observability-pushgateway:latest
+docker run -d -p 3000:3000 faresalawneh/llm-observability-grafana:latest
+```
+
+The baked Prometheus config points scrape targets at localhost, so this is the quickest way to demo the stack on one machine. For cross-host setups, use Docker Compose with environment overrides instead.
+
+## Running locally vs server
+
+Server:
+
+```bash
+cd monitoring
+docker compose --profile server up -d
+cd monitoring/scripts
+curl -X PUT http://localhost:9091/api/v1/admin/wipe
+python burstgpt_real_replay.py
+```
+
+Local laptop:
+
+```bash
+cd monitoring
+docker compose --profile local up -d
+docker exec ollama ollama pull llama3.2:1b
+cd monitoring/scripts
+curl -X PUT http://localhost:9091/api/v1/admin/wipe
+ENABLE_GPU_SCRAPE=0 INFERENCE_URL=http://localhost:11434/v1/completions MODEL=llama3.2:1b python burstgpt_real_replay.py
+```
+
+On the laptop, DCGM and vLLM targets will show as down in Prometheus. That is expected.
+
 ## Results
 
 Concurrency sweep from c=1 to c=50 found a clear sweet spot at c=10: 1,811 tokens/s at 73 ms TTFT.
@@ -114,7 +149,7 @@ GPU saturation and a rising queue show up 15 to 30 seconds before first-token la
 `ci.yml` runs on every push to `main`:
 1. `pytest` for the API endpoints
 2. `bandit` security scan (zero high-severity findings required)
-3. Docker build and push to `faresalawneh/llm-observability-api:latest`
+3. Docker build and push for `faresalawneh/llm-observability-api:latest`, `faresalawneh/llm-observability-grafana:latest`, `faresalawneh/llm-observability-prometheus:latest`, and `faresalawneh/llm-observability-pushgateway:latest`
 
 ## Team
 

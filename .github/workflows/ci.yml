@@ -37,9 +37,26 @@ jobs:
             prom/prometheus:latest \
             check config /prometheus.yml
 
-  docker-build:
+  publish-images:
     runs-on: ubuntu-latest
     needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image_name: llm-observability-api
+            context: ./api
+            dockerfile: ./Dockerfile
+          - image_name: llm-observability-grafana
+            context: .
+            dockerfile: ./docker/grafana/Dockerfile
+          - image_name: llm-observability-prometheus
+            context: .
+            dockerfile: ./docker/prometheus/Dockerfile
+          - image_name: llm-observability-pushgateway
+            context: .
+            dockerfile: ./docker/pushgateway/Dockerfile
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -50,17 +67,12 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/llm-observability-api:latest ./api
-
-      - name: Push image to Docker Hub
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/llm-observability-api:latest
-
-      - name: Save Docker image as artifact
-        run: docker save ${{ secrets.DOCKERHUB_USERNAME }}/llm-observability-api:latest -o llm-api.tar
-
-      - name: Upload Docker image as artifact
-        uses: actions/upload-artifact@v4
+      - name: Build and push image
+        uses: docker/build-push-action@v6
         with:
-          name: llm-observability-api-image
-          path: llm-api.tar
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}:${{ github.sha }}

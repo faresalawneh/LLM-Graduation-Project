@@ -3,24 +3,22 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-
-  # AIPerf metrics pushed from GPU server
-  - job_name: 'pushgateway'
+  - job_name: pushgateway
     honor_labels: true
     static_configs:
-      - targets: ['pushgateway:9091']
+      - targets:
+          - pushgateway:9091
 
-  # GPU metrics scraped directly from DCGM Exporter on JUST server
-  # CHANGE: replace with actual server IP
-  - job_name: 'dcgm_exporter'
+  - job_name: dcgm_exporter
     static_configs:
-      - targets: ['10.242.237.172:9400']   # e.g. '10.0.0.5:9400'
+      - targets:
+          - dcgm-exporter:9400
     metrics_path: /metrics
     scrape_interval: 10s
 
-  # vLLM OpenAI-compatible server metrics
-  - job_name: 'vllm'
+  - job_name: vllm
     static_configs:
-      - targets: ['10.242.237.172:8000']
+      - targets:
+          - 10.242.237.172:8000
     metrics_path: /metrics
     scrape_interval: 15s

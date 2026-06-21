@@ -9,6 +9,7 @@ Burst window:  bucket 23832 (9483 requests / 15 min)
 import csv
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -16,12 +17,12 @@ from pathlib import Path
 import requests
 
 # ── Config ────────────────────────────────────────────────────────────────────
-VLLM_URL          = "http://localhost:8000/v1/completions"
-VLLM_MODEL        = "facebook/opt-125m"
+INFERENCE_URL     = os.getenv("INFERENCE_URL", "http://localhost:8000/v1/completions")
+MODEL             = os.getenv("MODEL", "facebook/opt-125m")
 PUSHGATEWAY_URL   = "http://localhost:9091/metrics/job/{job}"
 PROMETHEUS_URL    = "http://localhost:9090/api/v1/query"
-DATASET_PATH      = Path("/media/works/BurstGPT_without_fails_3.csv")
-ARTIFACT_ROOT     = Path("/media/works/aiperf_results")
+DATASET_PATH      = Path(os.getenv("DATASET_PATH", "/media/works/BurstGPT_without_fails_3.csv"))
+ARTIFACT_ROOT     = Path(os.getenv("ARTIFACT_ROOT", "/media/works/aiperf_results"))
 MAX_TOKENS_CAP    = 1024   # cap outliers from dataset
 MAX_CONCURRENCY   = 100    # max simultaneous active requests
 
@@ -40,6 +41,7 @@ GPU_SCRAPE_INTERVAL       = 5
 PAUSE_BETWEEN_SCENARIOS   = 15
 
 RUN_ONLY = "both"   # "steady" | "burst" | "both"
+ENABLE_GPU_SCRAPE = os.getenv("ENABLE_GPU_SCRAPE", "1") == "1"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("burstgpt_replay")
@@ -119,7 +121,7 @@ def send_request(row, scenario, results, lock, semaphore, profile_path):
     prompt         = "x " * min(prompt_tokens, 200)
 
     payload = {
-        "model": VLLM_MODEL,
+        "model": MODEL,
         "prompt": prompt,
         "max_tokens": max_tokens,
         "stream": True,
@@ -131,7 +133,7 @@ def send_request(row, scenario, results, lock, semaphore, profile_path):
         output_tokens = 0
 
         try:
-            with requests.post(VLLM_URL, json=payload, stream=True, timeout=120) as resp:
+            with requests.post(INFERENCE_URL, json=payload, stream=True, timeout=120) as resp:
                 resp.raise_for_status()
                 for line in resp.iter_lines():
                     if not line:
@@ -146,12 +148,11 @@ def send_request(row, scenario, results, lock, semaphore, profile_path):
                     except json.JSONDecodeError:
                         continue
 
-                # First chunk received = first token = TTFT
-                if ttft_ms is None:
-                    ttft_ms = (time.perf_counter() - t0) * 1000
+                    if ttft_ms is None:
+                        ttft_ms = (time.perf_counter() - t0) * 1000
 
-                token_text = chunk.get("choices", [{}])[0].get("text", "")
-                output_tokens += len(token_text.split())
+                    token_text = chunk.get("choices", [{}])[0].get("text", "")
+                    output_tokens += len(token_text.split())
 
             t1 = time.perf_counter()
             latency_ms = (t1 - t0) * 1000
@@ -173,7 +174,7 @@ def send_request(row, scenario, results, lock, semaphore, profile_path):
                 with profile_path.open("a") as pf:
                     pf.write(json.dumps(record) + "\n")
 
-            log.info("[%s] ttft=%.1fms latency=%.1fms throughput=%.1f tok/s",
+                log.info("[%s] ttft=%.1fms lat=%.1fms tps=%.1f",
                     scenario, ttft_ms, latency_ms, throughput)
 
         except Exception as e:
@@ -190,10 +191,13 @@ def run_scenario(scenario, bucket_id, artifact_dir):
         log.error("No rows found for bucket %d", bucket_id)
         return
 
-    stop = threading.Event()
-    gpu_thread = threading.Thread(
-        target=gpu_scrape_thread, args=(stop, artifact_dir), daemon=True)
-    gpu_thread.start()
+    stop = None
+    gpu_thread = None
+    if ENABLE_GPU_SCRAPE:
+        stop = threading.Event()
+        gpu_thread = threading.Thread(
+            target=gpu_scrape_thread, args=(stop, artifact_dir), daemon=True)
+        gpu_thread.start()
 
     semaphore = threading.Semaphore(MAX_CONCURRENCY)
     profile_path = artifact_dir / "profile_export.jsonl"
@@ -226,7 +230,10 @@ def run_scenario(scenario, bucket_id, artifact_dir):
     for t in threads:
         t.join(timeout=120)
 
-    stop.set()
+    if stop is not None:
+        stop.set()
+    if gpu_thread is not None:
+        gpu_thread.join(timeout=10)
 
     if results:
         avg_latency   = sum(r["latency_ms"] for r in results) / len(results)
@@ -248,10 +255,19 @@ def run_scenario(scenario, bucket_id, artifact_dir):
             "p95_latency_ms": p95_latency,
             "avg_throughput_tokens_per_sec": avg_throughput,
         }
-        with (artifact_dir / "summary.json").open("w") as f:
-            json.dump(summary, f, indent=2)
     else:
         log.warning("[%s] no successful requests", scenario)
+        summary = {
+            "scenario": scenario,
+            "total_requests": 0,
+            "avg_ttft_ms": 0.0,
+            "avg_latency_ms": 0.0,
+            "p95_latency_ms": 0.0,
+            "avg_throughput_tokens_per_sec": 0.0,
+        }
+
+    with (artifact_dir / "summary.json").open("w") as f:
+        json.dump(summary, f, indent=2)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
