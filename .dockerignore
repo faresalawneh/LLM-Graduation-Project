@@ -1,0 +1,13 @@
+.git
+.github
+monitoring
+results
+replay_results
+aiperf_results
+*.csv
+README*.md
+docs
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd

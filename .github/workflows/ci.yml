@@ -46,8 +46,8 @@ jobs:
       matrix:
         include:
           - image_name: llm-observability-api
-            context: ./api
-            dockerfile: ./Dockerfile
+            context: .
+            dockerfile: ./api/Dockerfile
           - image_name: llm-observability-grafana
             context: .
             dockerfile: ./docker/grafana/Dockerfile
