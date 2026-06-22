@@ -1,0 +1,8 @@
+{
+  "scenario": "burst",
+  "total_requests": 9483,
+  "avg_ttft_ms": 47540.22057731681,
+  "avg_latency_ms": 47974.58626903915,
+  "p95_latency_ms": 81284.4648999162,
+  "avg_throughput_tokens_per_sec": 0.24918028839466524
+}

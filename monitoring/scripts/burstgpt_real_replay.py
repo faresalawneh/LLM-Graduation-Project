@@ -24,7 +24,8 @@ PROMETHEUS_URL    = "http://localhost:9090/api/v1/query"
 DATASET_PATH      = Path(os.getenv("DATASET_PATH", "/media/works/BurstGPT_without_fails_3.csv"))
 ARTIFACT_ROOT     = Path(os.getenv("ARTIFACT_ROOT", "/media/works/aiperf_results"))
 MAX_TOKENS_CAP    = 1024   # cap outliers from dataset
-MAX_CONCURRENCY   = 100    # max simultaneous active requests
+MAX_CONCURRENCY   = int(os.getenv("MAX_CONCURRENCY", "100"))
+REQUEST_TIMEOUT   = int(os.getenv("REQUEST_TIMEOUT", "120"))
 
 # 15-minute bucket IDs from dataset analysis
 STEADY_BUCKET     = 21661   # 72 requests / 15 min
@@ -133,7 +134,7 @@ def send_request(row, scenario, results, lock, semaphore, profile_path):
         output_tokens = 0
 
         try:
-            with requests.post(INFERENCE_URL, json=payload, stream=True, timeout=120) as resp:
+            with requests.post(INFERENCE_URL, json=payload, stream=True, timeout=REQUEST_TIMEOUT) as resp:
                 resp.raise_for_status()
                 for line in resp.iter_lines():
                     if not line:
@@ -167,7 +168,7 @@ def send_request(row, scenario, results, lock, semaphore, profile_path):
             record = {
                 "ttft_ms": ttft_ms,
                 "latency_ms": latency_ms,
-                "throughput_tokens_per_sec": throughput,
+                "throughput": throughput,
             }
             with lock:
                 results.append(record)
@@ -228,7 +229,7 @@ def run_scenario(scenario, bucket_id, artifact_dir):
         threads.append(t)
 
     for t in threads:
-        t.join(timeout=120)
+        t.join(timeout=REQUEST_TIMEOUT)
 
     if stop is not None:
         stop.set()

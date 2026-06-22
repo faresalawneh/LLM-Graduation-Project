@@ -1,0 +1,8 @@
+{
+  "scenario": "steady",
+  "total_requests": 72,
+  "avg_ttft_ms": 509.19179444867444,
+  "avg_latency_ms": 2877.914681948217,
+  "p95_latency_ms": 7151.911200024188,
+  "avg_throughput_tokens_per_sec": 20.99473556119115
+}
