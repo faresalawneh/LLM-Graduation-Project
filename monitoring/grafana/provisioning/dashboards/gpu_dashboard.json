@@ -1,0 +1,54 @@
+{
+  "title": "GPU Telemetry (DCGM)",
+  "uid": "gpu-dcgm",
+  "schemaVersion": 27,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "title": "SM Clock (MHz) - utilization proxy on Tesla P40",
+      "description": "DCGM_FI_DEV_GPU_UTIL returns 0 on P40, so SM clock is used as the utilization proxy. Idle clock is low; under load it ramps to max boost.",
+      "type": "timeseries",
+      "targets": [{ "expr": "DCGM_FI_DEV_SM_CLOCK", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": {} }
+    },
+    {
+      "title": "GPU Memory Used (MiB)",
+      "type": "timeseries",
+      "targets": [{ "expr": "DCGM_FI_DEV_FB_USED", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "mbytes" } }
+    },
+    {
+      "title": "Power Usage (W)",
+      "type": "timeseries",
+      "targets": [{ "expr": "DCGM_FI_DEV_POWER_USAGE", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "watt" } }
+    },
+    {
+      "title": "GPU Temperature (C)",
+      "type": "timeseries",
+      "targets": [{ "expr": "DCGM_FI_DEV_GPU_TEMP", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "celsius" } }
+    },
+    {
+      "title": "Memory Clock (MHz)",
+      "type": "timeseries",
+      "targets": [{ "expr": "DCGM_FI_DEV_MEM_CLOCK", "legendFormat": "GPU {{gpu}}" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+    },
+    {
+      "title": "PCIe Throughput (if exposed)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "DCGM_FI_PROF_PCIE_TX_BYTES", "legendFormat": "TX GPU {{gpu}}" },
+        { "expr": "DCGM_FI_PROF_PCIE_RX_BYTES", "legendFormat": "RX GPU {{gpu}}" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "Bps" } }
+    }
+  ]
+}

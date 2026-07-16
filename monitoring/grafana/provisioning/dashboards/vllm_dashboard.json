@@ -1,0 +1,163 @@
+{
+  "title": "vLLM Serving Metrics",
+  "uid": "vllm-serving",
+  "schemaVersion": 27,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    { "type": "row", "title": "Scenario Replay (Pushgateway)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "panels": [] },
+    {
+      "title": "TTFT (ms) by Scenario",
+      "type": "timeseries",
+      "targets": [{ "expr": "ttft_ms", "legendFormat": "{{scenario}}" }],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "steady" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }] },
+          { "matcher": { "id": "byName", "options": "burst" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } }] }
+        ]
+      }
+    },
+    {
+      "title": "Request Latency (ms) by Scenario",
+      "type": "timeseries",
+      "targets": [{ "expr": "request_latency_ms", "legendFormat": "{{scenario}}" }],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "steady" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }] },
+          { "matcher": { "id": "byName", "options": "burst" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } }] }
+        ]
+      }
+    },
+    {
+      "title": "Throughput (tokens/s) by Scenario",
+      "type": "timeseries",
+      "targets": [{ "expr": "throughput_tokens_per_sec", "legendFormat": "{{scenario}}" }],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "steady" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }] },
+          { "matcher": { "id": "byName", "options": "burst" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } }] }
+        ]
+      }
+    },
+
+    { "type": "row", "title": "TTFT (vLLM histogram)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }, "panels": [] },
+    {
+      "title": "TTFT Over Time (avg)",
+      "type": "timeseries",
+      "targets": [{ "expr": "rate(vllm:time_to_first_token_seconds_sum[1m]) / rate(vllm:time_to_first_token_seconds_count[1m])", "legendFormat": "avg TTFT" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "TTFT P50",
+      "type": "stat",
+      "targets": [{ "expr": "histogram_quantile(0.50, sum by(le) (rate(vllm:time_to_first_token_seconds_bucket[$__range])))" }],
+      "gridPos": { "h": 4, "w": 3, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } }
+    },
+    {
+      "title": "TTFT P90",
+      "type": "stat",
+      "targets": [{ "expr": "histogram_quantile(0.90, sum by(le) (rate(vllm:time_to_first_token_seconds_bucket[$__range])))" }],
+      "gridPos": { "h": 4, "w": 3, "x": 15, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } }
+    },
+    {
+      "title": "TTFT P99",
+      "type": "stat",
+      "targets": [{ "expr": "histogram_quantile(0.99, sum by(le) (rate(vllm:time_to_first_token_seconds_bucket[$__range])))" }],
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } }
+    },
+    {
+      "title": "TTFT Avg",
+      "type": "stat",
+      "targets": [{ "expr": "sum(increase(vllm:time_to_first_token_seconds_sum[$__range])) / sum(increase(vllm:time_to_first_token_seconds_count[$__range]))" }],
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } }
+    },
+
+    { "type": "row", "title": "E2E Latency (vLLM histogram)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }, "panels": [] },
+    {
+      "title": "E2E Latency Over Time (avg)",
+      "type": "timeseries",
+      "targets": [{ "expr": "rate(vllm:e2e_request_latency_seconds_sum[1m]) / rate(vllm:e2e_request_latency_seconds_count[1m])", "legendFormat": "avg E2E" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "E2E P50",
+      "type": "stat",
+      "targets": [{ "expr": "histogram_quantile(0.50, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket[$__range])))" }],
+      "gridPos": { "h": 4, "w": 3, "x": 12, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 2 } }
+    },
+    {
+      "title": "E2E P90",
+      "type": "stat",
+      "targets": [{ "expr": "histogram_quantile(0.90, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket[$__range])))" }],
+      "gridPos": { "h": 4, "w": 3, "x": 15, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 2 } }
+    },
+    {
+      "title": "E2E P95",
+      "type": "stat",
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket[$__range])))" }],
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 2 } }
+    },
+    {
+      "title": "E2E P99",
+      "type": "stat",
+      "targets": [{ "expr": "histogram_quantile(0.99, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket[$__range])))" }],
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 2 } }
+    },
+
+    { "type": "row", "title": "Tokens and Requests", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 }, "panels": [] },
+    {
+      "title": "Prompt vs Generation Tokens/s",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(vllm:prompt_tokens_total[1m])", "legendFormat": "prompt tok/s" },
+        { "expr": "rate(vllm:generation_tokens_total[1m])", "legendFormat": "generation tok/s" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 }
+    },
+    {
+      "title": "Successful Requests/s",
+      "type": "timeseries",
+      "targets": [{ "expr": "rate(vllm:request_success_total[1m])", "legendFormat": "req/s" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 }
+    },
+
+    { "type": "row", "title": "Engine State", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 }, "panels": [] },
+    {
+      "title": "Queue Depth (Waiting Requests)",
+      "type": "timeseries",
+      "targets": [{ "expr": "vllm:num_requests_waiting", "legendFormat": "waiting" }],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 37 },
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "title": "Running Requests",
+      "type": "timeseries",
+      "targets": [{ "expr": "vllm:num_requests_running", "legendFormat": "running" }],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 37 },
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "title": "KV Cache Usage (%)",
+      "type": "timeseries",
+      "targets": [{ "expr": "vllm:gpu_cache_usage_perc * 100", "legendFormat": "KV cache" }],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 37 },
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100 } }
+    }
+  ]
+}
