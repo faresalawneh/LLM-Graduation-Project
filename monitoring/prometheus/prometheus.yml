@@ -18,7 +18,6 @@ scrape_configs:
 
   - job_name: vllm
     static_configs:
-      - targets:
-          - 10.242.237.172:8000
+      - targets: ['host.docker.internal:8000']
     metrics_path: /metrics
     scrape_interval: 15s

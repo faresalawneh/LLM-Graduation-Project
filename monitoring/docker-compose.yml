@@ -58,18 +58,18 @@ services:
   #  networks:
   #    - monitoring
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    restart: unless-stopped
-    profiles:
-      - local
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    networks:
-      - monitoring
+  #ollama:
+  #  image: ollama/ollama:latest
+  #  container_name: ollama
+  #  restart: unless-stopped
+  #  profiles:
+  #    - local
+  #  volumes:
+  #    - ollama_data:/root/.ollama
+  #  ports:
+  #    - "11434:11434"
+  #  networks:
+  #    - monitoring
 
 networks:
   monitoring:
@@ -81,17 +81,17 @@ volumes:
   ollama_data:
 
  
-jaeger:
-    image: jaegertracing/all-in-one:1.57
-    container_name: jaeger
-    restart: unless-stopped
-    profiles:
-      - server
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    ports:
-      - "16686:16686"    #UI
-      - "4317:4317"      #OTLP gRPC (vLLM + replay send here)
-      - "4318:4318"      #OTLP HTTP
-    networks:
-      - monitoring 
+#jaeger:
+#    image: jaegertracing/all-in-one:1.57
+#    container_name: jaeger
+#    restart: unless-stopped
+#    profiles:
+#      - server
+#    environment:
+#      - COLLECTOR_OTLP_ENABLED=true
+#    ports:
+#      - "16686:16686"    #UI
+#      - "4317:4317"      #OTLP gRPC (vLLM + replay send here)
+#      - "4318:4318"      #OTLP HTTP
+#    networks:
+#      - monitoring 

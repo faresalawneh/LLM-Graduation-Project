@@ -1,4 +1,6 @@
-monitoring/BurstGPT_without_fails_3.csv
+.pytest_cache
+.junie
 monitoring/BurstGPT_without_fails_3.csv
 __pycache__/
 *.pyc
+__pycache__
