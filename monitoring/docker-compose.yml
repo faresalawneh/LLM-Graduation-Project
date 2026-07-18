@@ -101,6 +101,45 @@ services:
   #  networks:
   #    - monitoring
 
+
+  vllm:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:latest}
+    container_name: vllm
+    restart: unless-stopped
+    profiles:
+      - local
+    command:
+      - --model
+      - Qwen/Qwen2.5-0.5B-Instruct
+      - --dtype
+      - float16
+      - --max-model-len
+      - "4096"
+      - --gpu-memory-utilization
+      - "0.75"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 300s
+
+
 networks:
   monitoring:
     driver: bridge
@@ -109,6 +148,7 @@ volumes:
   prometheus_data:
   grafana_data:
   ollama_data:
+  hf_cache:
 
  
 #jaeger:

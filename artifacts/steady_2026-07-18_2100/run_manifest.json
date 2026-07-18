@@ -1,0 +1,14 @@
+{
+  "start_time": "2026-07-18T21:00:44+0300",
+  "scenario": "steady",
+  "inference_url": "http://localhost:8000",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "endpoint_type": "completions",
+  "trace_file": "/mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/monitoring/scripts/steady_window.csv",
+  "trace_row_count": 72,
+  "artifact_dir": "/mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/artifacts/steady_2026-07-18_2100",
+  "slice_duration": "5",
+  "tokenizer": "",
+  "enable_gpu_scrape": true,
+  "otel_url": "http://localhost:4318/v1/metrics"
+}
