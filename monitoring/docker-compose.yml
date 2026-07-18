@@ -11,12 +11,16 @@ services:
     networks:
       - monitoring
 
-  pushgateway:
-    image: ${PUSHGATEWAY_IMAGE:-prom/pushgateway:latest}
-    container_name: pushgateway
+  otel-collector:
+    image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:0.116.1}
+    container_name: otel-collector
     restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yml"]
+    volumes:
+      - ./otel/otel-collector-config.yml:/etc/otelcol/config.yml
     ports:
-      - "9091:9091"
+      - "4318:4318"   # OTLP HTTP receiver (aiperf --otel-url)
+      - "8889:8889"   # Prometheus exporter (scraped by prometheus)
     networks:
       - monitoring
 
@@ -36,7 +40,6 @@ services:
       - monitoring
     depends_on:
       - prometheus
-      - pushgateway
 
   #dcgm-exporter:
   #  image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04
