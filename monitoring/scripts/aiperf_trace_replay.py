@@ -35,7 +35,7 @@ MODEL           = os.getenv("MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
 TRACE_FILE      = Path(os.getenv("TRACE_FILE", "test_trace.csv"))
 SCENARIO        = os.getenv("SCENARIO", "steady")   # "steady" | "burst"
 ARTIFACT_ROOT   = Path(os.getenv("ARTIFACT_ROOT", "aiperf_results"))
-ENDPOINT_TYPE   = os.getenv("ENDPOINT_TYPE", "chat")
+ENDPOINT_TYPE   = os.getenv("ENDPOINT_TYPE", "completions")
 TOKENIZER       = os.getenv("TOKENIZER", "")   # optional local tokenizer path/id
 SLICE_DURATION  = os.getenv("SLICE_DURATION", "5")
 
@@ -205,11 +205,35 @@ def tail_jsonl_and_push(stop_event: threading.Event, artifact_dir: Path, scenari
 
 # ── Scenario runner ───────────────────────────────────────────────────────────
 
+def count_trace_rows(trace_file: Path) -> int:
+    with trace_file.open() as f:
+        return max(sum(1 for line in f if line.strip()) - 1, 0)  # minus header
+
+
+def write_run_manifest(artifact_dir: Path, scenario: str) -> None:
+    manifest = {
+        "start_time": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "scenario": scenario,
+        "inference_url": INFERENCE_URL,
+        "model": MODEL,
+        "endpoint_type": ENDPOINT_TYPE,
+        "trace_file": str(TRACE_FILE),
+        "trace_row_count": count_trace_rows(TRACE_FILE),
+        "artifact_dir": str(artifact_dir),
+        "slice_duration": SLICE_DURATION,
+        "tokenizer": TOKENIZER,
+        "pushgateway_url": PUSHGATEWAY_URL.format(job="llm_bench_" + scenario),
+        "enable_gpu_scrape": ENABLE_GPU_SCRAPE,
+    }
+    with (artifact_dir / "run_manifest.json").open("w") as f:
+        json.dump(manifest, f, indent=2)
+
+
 def run_scenario(scenario: str, artifact_dir: Path) -> int:
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    export_path = artifact_dir / "profile_export.jsonl"
-    if export_path.exists():
-        export_path.unlink()
+    # artifact_dir is freshly timestamped per run, so profile_export.jsonl
+    # cannot exist yet and the tail thread always reads it from the beginning.
+    artifact_dir.mkdir(parents=True, exist_ok=False)
+    write_run_manifest(artifact_dir, scenario)
 
     stop_event = threading.Event()
     tail_thread = threading.Thread(
@@ -252,7 +276,13 @@ def main() -> int:
         log.error("TRACE_FILE not found: %s", TRACE_FILE)
         return 2
 
-    artifact_dir = ARTIFACT_ROOT / "{}_trace_replay".format(SCENARIO)
+    artifact_dir = ARTIFACT_ROOT / "{}_{}".format(SCENARIO, time.strftime("%Y-%m-%d_%H%M"))
+    # two runs within the same minute would collide on exist_ok=False; add a suffix
+    suffix = 1
+    while artifact_dir.exists():
+        artifact_dir = ARTIFACT_ROOT / "{}_{}_{}".format(
+            SCENARIO, time.strftime("%Y-%m-%d_%H%M"), suffix)
+        suffix += 1
     log.info("Starting %s trace replay of %s", SCENARIO, TRACE_FILE)
     rc = run_scenario(SCENARIO, artifact_dir)
     log.info("AIPerf exited with code %s (artifacts in %s)", rc, artifact_dir)
