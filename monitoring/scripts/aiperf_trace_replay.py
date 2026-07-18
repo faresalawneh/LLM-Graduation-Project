@@ -37,6 +37,16 @@ SCENARIO        = os.getenv("SCENARIO", "steady")   # "steady" | "burst"
 ARTIFACT_ROOT   = Path(os.getenv("ARTIFACT_ROOT", "aiperf_results"))
 ENDPOINT_TYPE   = os.getenv("ENDPOINT_TYPE", "completions")
 TOKENIZER       = os.getenv("TOKENIZER", "")   # optional local tokenizer path/id
+
+# Live metrics: aiperf streams OTel metrics DURING the run to the otel-collector
+# (monitoring/docker-compose.yml), which renames them to ttft_ms /
+# request_latency_ms / throughput_tokens_per_sec for Prometheus/Grafana.
+# Requires the otel extra: pip install "aiperf[otel]". Set OTEL_URL="" to disable.
+OTEL_URL        = os.getenv("OTEL_URL", "http://localhost:4318")
+# Legacy Pushgateway path: tails profile_export.jsonl and pushes per-request
+# metrics. aiperf 0.11 only flushes the jsonl at end of run, so this gives no
+# live data anymore — kept as a fallback, off by default.
+ENABLE_TAIL_PUSH = os.getenv("ENABLE_TAIL_PUSH", "0") == "1"
 SLICE_DURATION  = os.getenv("SLICE_DURATION", "5")
 
 PUSHGATEWAY_URL = os.getenv("PUSHGATEWAY_URL", "http://localhost:9091") + "/metrics/job/{job}"
@@ -84,6 +94,12 @@ def build_aiperf_command(artifact_dir: Path) -> List[str]:
     ]
     if TOKENIZER:
         command += ["--tokenizer", TOKENIZER]
+    if OTEL_URL:
+        command += [
+            "--otel-url", OTEL_URL,
+            "--stream", "metrics",
+            "--otel-resource-attributes", "scenario={}".format(SCENARIO),
+        ]
     return command
 
 
@@ -224,6 +240,8 @@ def write_run_manifest(artifact_dir: Path, scenario: str) -> None:
         "tokenizer": TOKENIZER,
         "pushgateway_url": PUSHGATEWAY_URL.format(job="llm_bench_" + scenario),
         "enable_gpu_scrape": ENABLE_GPU_SCRAPE,
+        "otel_url": OTEL_URL,
+        "enable_tail_push": ENABLE_TAIL_PUSH,
     }
     with (artifact_dir / "run_manifest.json").open("w") as f:
         json.dump(manifest, f, indent=2)
@@ -236,12 +254,14 @@ def run_scenario(scenario: str, artifact_dir: Path) -> int:
     write_run_manifest(artifact_dir, scenario)
 
     stop_event = threading.Event()
-    tail_thread = threading.Thread(
-        target=tail_jsonl_and_push,
-        args=(stop_event, artifact_dir, scenario),
-        daemon=True,
-    )
-    tail_thread.start()
+    tail_thread = None
+    if ENABLE_TAIL_PUSH:
+        tail_thread = threading.Thread(
+            target=tail_jsonl_and_push,
+            args=(stop_event, artifact_dir, scenario),
+            daemon=True,
+        )
+        tail_thread.start()
 
     gpu_thread = None
     if ENABLE_GPU_SCRAPE:
@@ -259,10 +279,12 @@ def run_scenario(scenario: str, artifact_dir: Path) -> int:
     try:
         rc = process.wait()
     finally:
-        # give the tail thread a moment to drain the last records
-        time.sleep(2)
+        if tail_thread is not None:
+            # give the tail thread a moment to drain the last records
+            time.sleep(2)
         stop_event.set()
-    tail_thread.join(timeout=10)
+    if tail_thread is not None:
+        tail_thread.join(timeout=10)
     if gpu_thread is not None:
         gpu_thread.join(timeout=10)
     return rc

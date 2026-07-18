@@ -22,6 +22,19 @@ services:
     networks:
       - monitoring
 
+  otel-collector:
+    image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:0.116.1}
+    container_name: otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yml"]
+    volumes:
+      - ./otel/otel-collector-config.yml:/etc/otelcol/config.yml
+    ports:
+      - "4318:4318"   # OTLP HTTP receiver (aiperf --otel-url)
+      - "8889:8889"   # Prometheus exporter (scraped by prometheus)
+    networks:
+      - monitoring
+
   grafana:
     image: ${GRAFANA_IMAGE:-grafana/grafana:latest}
     container_name: grafana

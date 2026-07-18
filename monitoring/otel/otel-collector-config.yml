@@ -1,0 +1,132 @@
+# OpenTelemetry Collector config for live AIPerf metrics streaming.
+#
+# AIPerf 0.11 streams per-batch metrics over OTLP/HTTP (--otel-url) DURING a
+# run, unlike profile_export.jsonl which is only flushed at the end. This
+# collector receives them on :4318 and re-exposes them on :8889 in Prometheus
+# format under the exact metric names the Grafana dashboards already query.
+#
+# ── Metric name mapping (aiperf 0.11.0 OTel names, verified empirically) ─────
+#
+#   aiperf OTel metric (histogram)                     -> Grafana metric (gauge)
+#   gen_ai.client.operation.time_to_first_chunk  [s]   -> ttft_ms                    [ms]
+#   gen_ai.client.operation.duration             [s]   -> request_latency_ms         [ms]
+#   aiperf.output_token_throughput_per_user [tok/s/u]  -> throughput_tokens_per_sec  [tok/s]
+#
+# AIPerf exports these as OTel *histograms*, but the dashboards query plain
+# gauge series (e.g. `ttft_ms{scenario="steady"}`). A renamed histogram would
+# only expose ttft_ms_bucket/_sum/_count, which the dashboards do not query.
+# So the pipeline below extracts each histogram's cumulative sum and count,
+# divides them (metricsgeneration) to get a running mean, scales seconds to
+# milliseconds, and attaches the scenario label from the OTel resource
+# attribute that aiperf_trace_replay.py passes via --otel-resource-attributes.
+#
+# Resulting series are running means over the run so far (the Pushgateway path
+# exposed the last request's value instead) — same names, labels, and units,
+# but smoother curves.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Keep only the three source histograms; everything else aiperf streams
+  # (http timings, token counts, scheduler timing) is dropped.
+  filter/aiperf_sources:
+    metrics:
+      include:
+        match_type: strict
+        metric_names:
+          - gen_ai.client.operation.time_to_first_chunk
+          - gen_ai.client.operation.duration
+          - aiperf.output_token_throughput_per_user
+
+  # Histogram -> <name>_sum and <name>_count companion metrics.
+  transform/extract_sum_count:
+    metric_statements:
+      - context: metric
+        statements:
+          - extract_sum_metric(true) where name == "gen_ai.client.operation.time_to_first_chunk"
+          - extract_count_metric(true) where name == "gen_ai.client.operation.time_to_first_chunk"
+          - extract_sum_metric(true) where name == "gen_ai.client.operation.duration"
+          - extract_count_metric(true) where name == "gen_ai.client.operation.duration"
+          - extract_sum_metric(true) where name == "aiperf.output_token_throughput_per_user"
+          - extract_count_metric(true) where name == "aiperf.output_token_throughput_per_user"
+
+  # The original histograms have served their purpose.
+  filter/drop_histograms:
+    metrics:
+      metric:
+        - 'type == METRIC_DATA_TYPE_HISTOGRAM'
+
+  # metricsgeneration only operates on gauges.
+  transform/sums_to_gauge:
+    metric_statements:
+      - context: metric
+        statements:
+          - convert_sum_to_gauge() where IsMatch(name, ".*_(sum|count)$")
+
+  # running mean = cumulative sum / cumulative count
+  metricsgeneration:
+    rules:
+      - name: ttft_ms
+        type: calculate
+        metric1: gen_ai.client.operation.time_to_first_chunk_sum
+        metric2: gen_ai.client.operation.time_to_first_chunk_count
+        operation: divide
+      - name: request_latency_ms
+        type: calculate
+        metric1: gen_ai.client.operation.duration_sum
+        metric2: gen_ai.client.operation.duration_count
+        operation: divide
+      - name: throughput_tokens_per_sec
+        type: calculate
+        metric1: aiperf.output_token_throughput_per_user_sum
+        metric2: aiperf.output_token_throughput_per_user_count
+        operation: divide
+
+  transform/finalize:
+    metric_statements:
+      # gen_ai.* histograms are in seconds; dashboards expect milliseconds.
+      # throughput is already tokens/sec, no scaling.
+      - context: metric
+        statements:
+          - scale_metric(1000.0) where name == "ttft_ms"
+          - scale_metric(1000.0) where name == "request_latency_ms"
+      # Promote the scenario resource attribute (set by aiperf_trace_replay.py
+      # via --otel-resource-attributes scenario=<steady|burst>) to a datapoint
+      # label and drop the per-worker/per-processor attributes so each metric
+      # is a single low-cardinality series, matching the Pushgateway shape.
+      - context: datapoint
+        statements:
+          - set(attributes["scenario"], resource.attributes["scenario"]) where resource.attributes["scenario"] != nil
+          - keep_keys(attributes, ["scenario"])
+
+  # Export only the three renamed metrics, not the intermediate _sum/_count.
+  filter/final:
+    metrics:
+      include:
+        match_type: strict
+        metric_names:
+          - ttft_ms
+          - request_latency_ms
+          - throughput_tokens_per_sec
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors:
+        - filter/aiperf_sources
+        - transform/extract_sum_count
+        - filter/drop_histograms
+        - transform/sums_to_gauge
+        - metricsgeneration
+        - transform/finalize
+        - filter/final
+      exporters: [prometheus]

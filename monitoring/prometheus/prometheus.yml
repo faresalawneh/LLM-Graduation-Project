@@ -9,6 +9,13 @@ scrape_configs:
       - targets:
           - pushgateway:9091
 
+  - job_name: otel_collector
+    static_configs:
+      - targets:
+          - otel-collector:8889
+    metrics_path: /metrics
+    scrape_interval: 5s
+
   - job_name: dcgm_exporter
     static_configs:
       - targets:
