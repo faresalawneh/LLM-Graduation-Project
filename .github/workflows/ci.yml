@@ -22,9 +22,10 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r api/requirements.txt
+          pip install -r monitoring/exporters/requirements.txt
 
       - name: Run Pytest
-        run: pytest api/test_app.py -v --disable-warnings
+        run: pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v --disable-warnings
 
       - name: Run Security Scan
         run: bandit -r api/app.py
