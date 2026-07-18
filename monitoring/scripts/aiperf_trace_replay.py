@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
 """
-AIPerf BurstGPT trace replay with live Pushgateway export.
+AIPerf BurstGPT trace replay with live OTel metrics streaming.
 
-Alternative benchmark path to burstgpt_real_replay.py: instead of firing
-requests ourselves, AIPerf (>= 0.8.0) replays the BurstGPT trace natively via
---custom-dataset-type burst_gpt_trace --fixed-schedule, while a tail thread
-reads profile_export.jsonl and pushes the same per-request metrics
-(ttft_ms / request_latency_ms / throughput_tokens_per_sec) to the Pushgateway
-under the same scenario job names (llm_bench_steady / llm_bench_burst), so the
-existing Grafana dashboards work unchanged.
+Alternative benchmark path to burstgpt_real_replay.py: AIPerf (>= 0.8.0)
+replays the BurstGPT trace natively via --custom-dataset-type burst_gpt_trace
+--fixed-schedule, and streams per-batch metrics over OTLP/HTTP DURING the run
+to the otel-collector (monitoring/docker-compose.yml). The collector maps them
+to ttft_ms / request_latency_ms / throughput_tokens_per_sec with a scenario
+label (see monitoring/otel/otel-collector-config.yml), so the existing Grafana
+dashboards update live and work unchanged.
+
+Requires the otel extra: pip install "aiperf[otel]"
 
 AIPerf also auto-collects vLLM server metrics (333ms interval) into
 server_metrics_export.{json,csv,jsonl} inside the artifact dir.
 
 Note: --endpoint-type chat works with burst_gpt_trace (verified with
-aiperf 0.11.0 against Qwen2.5-0.5B-Instruct); completions was not needed.
+aiperf 0.11.0 against Qwen2.5-0.5B-Instruct); completions works as well
+and is the default.
+
+The old jsonl-tail + Pushgateway path was removed: aiperf 0.11 only flushes
+profile_export.jsonl at end of run, so tailing gave no live data. The
+reference implementation lives on in aiperf_with_push.py.
 """
 
 import json
@@ -37,19 +44,14 @@ SCENARIO        = os.getenv("SCENARIO", "steady")   # "steady" | "burst"
 ARTIFACT_ROOT   = Path(os.getenv("ARTIFACT_ROOT", "aiperf_results"))
 ENDPOINT_TYPE   = os.getenv("ENDPOINT_TYPE", "completions")
 TOKENIZER       = os.getenv("TOKENIZER", "")   # optional local tokenizer path/id
-
-# Live metrics: aiperf streams OTel metrics DURING the run to the otel-collector
-# (monitoring/docker-compose.yml), which renames them to ttft_ms /
-# request_latency_ms / throughput_tokens_per_sec for Prometheus/Grafana.
-# Requires the otel extra: pip install "aiperf[otel]". Set OTEL_URL="" to disable.
-OTEL_URL        = os.getenv("OTEL_URL", "http://localhost:4318")
-# Legacy Pushgateway path: tails profile_export.jsonl and pushes per-request
-# metrics. aiperf 0.11 only flushes the jsonl at end of run, so this gives no
-# live data anymore — kept as a fallback, off by default.
-ENABLE_TAIL_PUSH = os.getenv("ENABLE_TAIL_PUSH", "0") == "1"
 SLICE_DURATION  = os.getenv("SLICE_DURATION", "5")
 
-PUSHGATEWAY_URL = os.getenv("PUSHGATEWAY_URL", "http://localhost:9091") + "/metrics/job/{job}"
+# Live metrics endpoint. IMPORTANT: aiperf 0.11 does NOT auto-append the OTLP
+# path — --otel-url must be the FULL http://host:4318/v1/metrics URL. With a
+# bare host:port URL aiperf silently exports nothing.
+# Set OTEL_URL="" to disable streaming.
+OTEL_URL        = os.getenv("OTEL_URL", "http://localhost:4318/v1/metrics")
+
 PROMETHEUS_URL  = os.getenv("PROMETHEUS_URL", "http://localhost:9090") + "/api/v1/query"
 
 # Laptop has no DCGM exporter, so GPU scraping is off unless explicitly enabled.
@@ -105,53 +107,6 @@ def build_aiperf_command(artifact_dir: Path) -> List[str]:
 
 # ── Metric helpers ────────────────────────────────────────────────────────────
 
-def push_metric(name: str, value: float, scenario: str) -> None:
-    job = "llm_bench_{}".format(scenario)
-    url = PUSHGATEWAY_URL.format(job=job)
-    payload = '# TYPE {} gauge\n{}{{scenario="{}"}} {}\n'.format(name, name, scenario, value)
-    try:
-        requests.post(url, data=payload,
-                      headers={"Content-Type": "text/plain"}, timeout=5)
-    except Exception as e:
-        log.warning("Pushgateway error: %s", e)
-
-
-def extract_metric_value(record: dict, dotted_path: str):
-    current = record
-    for part in dotted_path.split('.'):
-        if not isinstance(current, dict) or part not in current:
-            return None
-        current = current[part]
-    if isinstance(current, dict):
-        if "value" in current:
-            current = current["value"]
-        elif "avg" in current:
-            current = current["avg"]
-    try:
-        return float(current)
-    except (TypeError, ValueError):
-        return None
-
-
-def push_request_metrics(record: dict, scenario: str) -> None:
-    # Schema verified against aiperf 0.11.0: per-request records still carry
-    # metrics.<name>.value dicts in ms, same as the paths aiperf_with_push.py uses.
-    ttft_ms = extract_metric_value(record, "metrics.time_to_first_token.value")
-    latency_ms = extract_metric_value(record, "metrics.request_latency.value")
-    tps = extract_metric_value(record, "metrics.output_token_throughput_per_user.value")
-
-    if ttft_ms is None or latency_ms is None or tps is None:
-        return
-
-    push_metric("ttft_ms", ttft_ms, scenario)
-    push_metric("request_latency_ms", latency_ms, scenario)
-    push_metric("throughput_tokens_per_sec", tps, scenario)
-    log.info(
-        "[%s] pushed ttft_ms=%.2f request_latency_ms=%.2f throughput_tokens_per_sec=%.2f",
-        scenario, ttft_ms, latency_ms, tps,
-    )
-
-
 def query_prometheus(query: str):
     try:
         r = requests.get(PROMETHEUS_URL, params={"query": query}, timeout=5)
@@ -186,39 +141,6 @@ def gpu_scrape_thread(stop, artifact_dir):
             stop.wait(GPU_SCRAPE_INTERVAL)
 
 
-# ── JSONL tail thread ─────────────────────────────────────────────────────────
-
-def tail_jsonl_and_push(stop_event: threading.Event, artifact_dir: Path, scenario: str) -> None:
-    export_path = artifact_dir / "profile_export.jsonl"
-    log.info("[%s] waiting for %s", scenario, export_path)
-
-    while not stop_event.is_set() and not export_path.exists():
-        time.sleep(0.5)
-
-    if stop_event.is_set():
-        return
-
-    log.info("[%s] tailing %s", scenario, export_path)
-    with export_path.open("r") as handle:
-        while not stop_event.is_set():
-            line = handle.readline()
-            if not line:
-                time.sleep(0.2)
-                continue
-
-            line = line.strip()
-            if not line:
-                continue
-
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                log.warning("[%s] skipping malformed JSON line", scenario)
-                continue
-
-            push_request_metrics(record, scenario)
-
-
 # ── Scenario runner ───────────────────────────────────────────────────────────
 
 def count_trace_rows(trace_file: Path) -> int:
@@ -238,31 +160,18 @@ def write_run_manifest(artifact_dir: Path, scenario: str) -> None:
         "artifact_dir": str(artifact_dir),
         "slice_duration": SLICE_DURATION,
         "tokenizer": TOKENIZER,
-        "pushgateway_url": PUSHGATEWAY_URL.format(job="llm_bench_" + scenario),
         "enable_gpu_scrape": ENABLE_GPU_SCRAPE,
         "otel_url": OTEL_URL,
-        "enable_tail_push": ENABLE_TAIL_PUSH,
     }
     with (artifact_dir / "run_manifest.json").open("w") as f:
         json.dump(manifest, f, indent=2)
 
 
 def run_scenario(scenario: str, artifact_dir: Path) -> int:
-    # artifact_dir is freshly timestamped per run, so profile_export.jsonl
-    # cannot exist yet and the tail thread always reads it from the beginning.
     artifact_dir.mkdir(parents=True, exist_ok=False)
     write_run_manifest(artifact_dir, scenario)
 
     stop_event = threading.Event()
-    tail_thread = None
-    if ENABLE_TAIL_PUSH:
-        tail_thread = threading.Thread(
-            target=tail_jsonl_and_push,
-            args=(stop_event, artifact_dir, scenario),
-            daemon=True,
-        )
-        tail_thread.start()
-
     gpu_thread = None
     if ENABLE_GPU_SCRAPE:
         gpu_thread = threading.Thread(
@@ -279,12 +188,7 @@ def run_scenario(scenario: str, artifact_dir: Path) -> int:
     try:
         rc = process.wait()
     finally:
-        if tail_thread is not None:
-            # give the tail thread a moment to drain the last records
-            time.sleep(2)
         stop_event.set()
-    if tail_thread is not None:
-        tail_thread.join(timeout=10)
     if gpu_thread is not None:
         gpu_thread.join(timeout=10)
     return rc

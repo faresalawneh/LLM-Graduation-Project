@@ -5,6 +5,10 @@
 # collector receives them on :4318 and re-exposes them on :8889 in Prometheus
 # format under the exact metric names the Grafana dashboards already query.
 #
+# GOTCHA: aiperf 0.11 does NOT auto-append the OTLP path to --otel-url. It must
+# be the FULL http://localhost:4318/v1/metrics URL; with a bare host:port URL
+# aiperf silently exports nothing (no error, no metrics on :8889).
+#
 # ── Metric name mapping (aiperf 0.11.0 OTel names, verified empirically) ─────
 #
 #   aiperf OTel metric (histogram)                     -> Grafana metric (gauge)

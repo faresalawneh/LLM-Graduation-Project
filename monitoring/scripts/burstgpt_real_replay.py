@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 BurstGPT Real Timestamp Replay
+
+LEGACY: superseded by aiperf_trace_replay.py (OTel live streaming). This script
+pushes to a Pushgateway on :9091, which was removed from
+monitoring/docker-compose.yml — to run it again, re-add the pushgateway service
+and its prometheus.yml scrape job.
 Replays LLM requests at their original inter-arrival times from the BurstGPT dataset.
 Steady window: bucket 21661 (72 requests / 15 min)
 Burst window:  bucket 23832 (9483 requests / 15 min)

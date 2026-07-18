@@ -3,12 +3,6 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: pushgateway
-    honor_labels: true
-    static_configs:
-      - targets:
-          - pushgateway:9091
-
   - job_name: otel_collector
     static_configs:
       - targets:
