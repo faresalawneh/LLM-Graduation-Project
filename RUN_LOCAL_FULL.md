@@ -94,8 +94,9 @@ scrape_configs:
     metrics_path: /metrics
 ```
 
-Note: locally the `dcgm_exporter` job will just show as DOWN (no DCGM on the
-laptop). That is fine - GPU panels stay empty, app panels work.
+Note: the `dcgm_exporter` job has two targets - `dcgm-exporter:9400` (server)
+and `nvml-exporter:9400` (laptop). Whichever profile is not running shows DOWN;
+that is expected.
 
 ### `monitoring/docker-compose.yml`
 
@@ -178,6 +179,26 @@ curl -s localhost:8889/metrics | grep ttft_ms   # shows ttft_ms{...,scenario="st
 Watch Grafana. The Scenario Replay row updates live during the run (TTFT,
 latency, throughput by scenario). The vLLM histogram and engine-state panels
 fill once Prometheus is scraping vLLM directly (Step 2).
+
+---
+
+## Verifying the GPU exporter (laptop)
+
+DCGM cannot run under WSL2, so the `local` profile ships an NVML-based
+exporter that mimics the DCGM metric names on the same port:
+
+```bash
+cd monitoring
+docker compose --profile local up -d nvml-exporter
+curl http://localhost:9400/metrics | grep DCGM_FI_DEV_GPU_UTIL
+```
+
+Notes:
+- Only `DCGM_FI_DEV_*` gauges exist here. `DCGM_FI_PROF_*` metrics do NOT -
+  profiling counters are DCP-family only, so those panels stay empty locally.
+- Temperature (`DCGM_FI_DEV_GPU_TEMP`) and power (`DCGM_FI_DEV_POWER_USAGE`)
+  are commonly unavailable under WSL2; the exporter skips them and logs a
+  warning on first scrape instead of failing.
 
 ---
 
