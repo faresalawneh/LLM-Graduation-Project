@@ -1,0 +1,256 @@
+2026-07-18 14:58:50.077 - GPUTelemetryJSONLWriter_b03fc4ad - INFO - GPU telemetry export enabled: /mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/monitoring/scripts/aiperf_local/steady_2026-07-18_1458/gpu_telemetry_export.jsonl
+2026-07-18 14:58:50.143 - server_metrics_manager - INFO - Server Metrics: Discovered 1 endpoints: ['http://localhost:8000/metrics']
+2026-07-18 14:58:50.169 - system_controller - INFO - Registered Worker Manager (id: 'worker_manager')
+2026-07-18 14:58:50.171 - system_controller - INFO - Registered Dataset Manager (id: 'dataset_manager')
+2026-07-18 14:58:50.374 - OTelMetricsResultsProcessor_3049f45a - INFO - Initialized OTelMetricsResultsProcessor
+2026-07-18 14:58:50.383 - system_controller - INFO - Registered Gpu Telemetry Manager (id: 'gpu_telemetry_manager')
+2026-07-18 14:58:50.385 - RecordExportResultsProcessor_ed257e8c - INFO - Record metrics export enabled: /mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/monitoring/scripts/aiperf_local/steady_2026-07-18_1458/profile_export.jsonl
+2026-07-18 14:58:50.390 - system_controller - INFO - Registered Server Metrics Manager (id: 'server_metrics_manager')
+2026-07-18 14:58:50.426 - system_controller - INFO - Registered Timing Manager (id: 'timing_manager')
+2026-07-18 14:58:50.574 - system_controller - INFO - Registered Record Processor (id: 'record_processor_10028770')
+2026-07-18 14:58:50.648 - system_controller - INFO - Registered Record Processor (id: 'record_processor_1565c97d')
+2026-07-18 14:58:50.804 - system_controller - INFO - Registered Worker (id: 'worker_ed36c21b')
+2026-07-18 14:58:50.806 - system_controller - INFO - Registered Worker (id: 'worker_11671c86')
+2026-07-18 14:58:50.820 - ServerMetricsJSONLWriter_82ebba7e - INFO - Server metrics JSONL export enabled: /mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/monitoring/scripts/aiperf_local/steady_2026-07-18_1458/server_metrics_export.jsonl
+2026-07-18 14:58:50.879 - OTelMetricsResultsProcessor_3049f45a - INFO - Initializing telemetry streaming sinks
+2026-07-18 14:58:50.884 - OTelMetricsResultsProcessor_3049f45a - INFO - Telemetry streaming enabled with process fanout (OTLP: True, MLflow live: False)
+2026-07-18 14:58:50.898 - system_controller - INFO - Registered Worker (id: 'worker_974038a0')
+2026-07-18 14:58:50.902 - system_controller - INFO - Registered Records Manager (id: 'records_manager')
+2026-07-18 14:58:50.911 - system_controller - INFO - Registered Worker (id: 'worker_a7e7d2bb')
+2026-07-18 14:58:50.929 - system_controller - INFO - Registered Worker (id: 'worker_39cc8d89')
+2026-07-18 14:58:50.945 - system_controller - INFO - Registered Worker (id: 'worker_37e3914b')
+2026-07-18 14:58:50.946 - system_controller - INFO - Registered Worker (id: 'worker_41b6dd18')
+2026-07-18 14:58:51.011 - system_controller - INFO - Registered Worker (id: 'worker_e89661db')
+2026-07-18 14:58:51.093 - system_controller - INFO - AIPerf System is CONFIGURING
+2026-07-18 14:58:51.093 - system_controller - INFO - Configuring all services to start profiling
+2026-07-18 14:58:51.094 - timing_manager - INFO - Waiting for dataset to be configured before configuring timing
+2026-07-18 14:58:51.095 - dataset_manager - INFO - Configuring tokenizer(s) for dataset manager
+2026-07-18 14:58:51.097 - InferenceResultParser_377a70f5 - INFO - Configuring tokenizers for inference result parser (resolve_alias: True)
+2026-07-18 14:58:51.097 - InferenceResultParser_7078adce - INFO - Configuring tokenizers for inference result parser (resolve_alias: True)
+2026-07-18 14:58:51.109 - server_metrics_manager - INFO - Server Metrics: Capturing baseline metrics...
+2026-07-18 14:58:51.119 - system_controller - INFO - Server metrics enabled - 1/1 endpoint(s) reachable.
+2026-07-18 14:58:51.123 - gpu_telemetry_manager - WARNING - GPU Telemetry: http://localhost:9400/metrics is not reachable
+2026-07-18 14:58:51.126 - gpu_telemetry_manager - WARNING - GPU Telemetry: http://localhost:9401/metrics is not reachable
+2026-07-18 14:58:51.127 - system_controller - INFO - DCGM telemetry skipped: no DCGM endpoints reachable
+2026-07-18 14:58:53.642 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 14:58:53.644 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 14:58:53.715 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/config.json "HTTP/1.1 200 OK"
+2026-07-18 14:58:53.718 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 14:58:53.719 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/config.json "HTTP/1.1 200 OK"
+2026-07-18 14:58:53.722 - huggingface_hub.utils._http - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-07-18 14:58:53.809 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/config.json "HTTP/1.1 200 OK"
+2026-07-18 14:58:53.908 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 14:58:53.912 - huggingface_hub.utils._http - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-07-18 14:58:53.931 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 14:58:53.933 - huggingface_hub.utils._http - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-07-18 14:58:53.980 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-07-18 14:58:54.006 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-07-18 14:58:54.008 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 14:58:54.093 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-07-18 14:58:54.156 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-07-18 14:58:54.184 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-07-18 14:58:54.284 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-07-18 14:58:54.329 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-07-18 14:58:54.368 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-07-18 14:58:54.476 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-07-18 14:58:54.963 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct "HTTP/1.1 200 OK"
+2026-07-18 14:58:54.970 - InferenceResultParser_377a70f5 - INFO - Initialized tokenizers: {'Qwen/Qwen2.5-0.5B-Instruct': {'class': 'Qwen2Tokenizer', 'name_or_path': 'Qwen/Qwen2.5-0.5B-Instruct'}} in 3.87 seconds
+2026-07-18 14:58:54.986 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct "HTTP/1.1 200 OK"
+2026-07-18 14:58:54.992 - InferenceResultParser_7078adce - INFO - Initialized tokenizers: {'Qwen/Qwen2.5-0.5B-Instruct': {'class': 'Qwen2Tokenizer', 'name_or_path': 'Qwen/Qwen2.5-0.5B-Instruct'}} in 3.89 seconds
+2026-07-18 14:58:55.157 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct "HTTP/1.1 200 OK"
+2026-07-18 14:58:55.165 - dataset_manager - INFO - Tokenizer(s) configured in 4.07 seconds
+2026-07-18 14:58:55.165 - dataset_manager - INFO - Configuring dataset for dataset_manager
+2026-07-18 14:58:55.690 - CustomDatasetComposer - INFO - Using explicit dataset format: burst_gpt_trace
+2026-07-18 14:58:55.722 - MemoryMapDatasetBackingStore_2ec1327c - INFO - Memory-mapped backing store initialized (streaming to /tmp/aiperf_mmap_a17ba3795c57/dataset.dat)
+2026-07-18 14:58:55.729 - MemoryMapDatasetBackingStore_2ec1327c - INFO - Data file finalized: 72 conversations, 0.32 MB
+2026-07-18 14:58:55.730 - MemoryMapDatasetBackingStore_2ec1327c - INFO - Index file created: /tmp/aiperf_mmap_a17ba3795c57/index.dat
+2026-07-18 14:58:55.731 - dataset_manager - INFO - Backing store finalized: client_type=DatasetClientStoreType.MEMORY_MAP data_file_path=PosixPath('/tmp/aiperf_mmap_a17ba3795c57/dataset.dat') index_file_path=PosixPath('/tmp/aiperf_mmap_a17ba3795c57/index.dat') conversation_count=72 total_size_bytes=339335 compressed_data_file_path=None compressed_index_file_path=None compressed_size_bytes=0
+2026-07-18 14:58:55.732 - dataset_manager - INFO - sampling strategy: sequential, unique conversations: 72, unique turn count: 72
+2026-07-18 14:58:55.747 - PhaseOrchestrator_f6c093f2 - INFO - Initialized 1 phase(s): ['Profiling']
+2026-07-18 14:58:55.751 - dataset_manager - INFO - Generating inputs.json file at /mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/monitoring/scripts/aiperf_local/steady_2026-07-18_1458/inputs.json
+2026-07-18 14:58:55.767 - dataset_manager - INFO - inputs.json file generated in 0.02 seconds
+2026-07-18 14:58:55.900 - dataset_manager - INFO - Dataset client initialized and freed 72 conversations from memory
+2026-07-18 14:58:55.901 - dataset_manager - INFO - Dataset configured in 0.74 seconds
+2026-07-18 14:58:55.902 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 14:58:55.902 - system_controller - INFO - All services configured in 4.81 seconds
+2026-07-18 14:58:55.902 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 0 timeslice metric results
+2026-07-18 14:58:55.903 - system_controller - INFO - AIPerf System is CONFIGURED
+2026-07-18 14:58:55.906 - server_metrics_manager - INFO - Server Metrics: Started 1 collector(s) successfully
+2026-07-18 14:58:55.906 - FixedScheduleTiming - INFO - Built schedule with 72 timestamps, zero_ms=19494908000, auto_offset=True
+2026-07-18 14:58:55.907 - PhaseRunner - NOTICE - Phase profiling started | target: 72 requests, 72 sessions
+2026-07-18 14:58:55.907 - system_controller - INFO - All services started profiling successfully
+2026-07-18 14:58:55.907 - system_controller - INFO - AIPerf System is PROFILING
+2026-07-18 14:58:55.908 - records_manager - INFO - Credit phase start: profiling
+2026-07-18 14:59:00.952 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 14:59:00.956 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 1 timeslice metric results
+2026-07-18 14:59:35.958 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 14:59:35.964 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 2 timeslice metric results
+2026-07-18 14:59:37.190 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 14:59:40.973 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 14:59:40.991 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 3 timeslice metric results
+2026-07-18 15:00:19.035 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:00:20.993 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:00:21.006 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 4 timeslice metric results
+2026-07-18 15:00:56.013 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:00:56.029 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 5 timeslice metric results
+2026-07-18 15:01:11.032 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:01:11.059 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 7 timeslice metric results
+2026-07-18 15:01:12.925 - aiperf.metrics.types.osl_mismatch_metrics - WARNING - OSL mismatch: got 145 tokens (requested 631, diff -77.0%)
+2026-07-18 15:01:12.929 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:01:13.198 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:01:16.072 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:01:16.092 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 7 timeslice metric results
+2026-07-18 15:01:34.775 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:01:36.097 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:01:36.147 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 8 timeslice metric results
+2026-07-18 15:01:47.706 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:01:51.162 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:01:51.186 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 9 timeslice metric results
+2026-07-18 15:02:05.245 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:02:06.187 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:02:06.218 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 10 timeslice metric results
+2026-07-18 15:02:16.249 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:02:16.292 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 11 timeslice metric results
+2026-07-18 15:02:41.298 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:02:41.334 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 12 timeslice metric results
+2026-07-18 15:02:49.533 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:02:51.359 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:02:51.403 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 13 timeslice metric results
+2026-07-18 15:03:04.473 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:03:06.418 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:03:06.464 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 14 timeslice metric results
+2026-07-18 15:03:11.475 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:03:11.513 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 15 timeslice metric results
+2026-07-18 15:03:26.518 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:03:26.562 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 16 timeslice metric results
+2026-07-18 15:04:06.567 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:04:06.606 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 17 timeslice metric results
+2026-07-18 15:04:16.619 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:04:16.663 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 18 timeslice metric results
+2026-07-18 15:04:28.407 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:04:31.676 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:04:31.724 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 19 timeslice metric results
+2026-07-18 15:04:46.735 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:04:46.780 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 20 timeslice metric results
+2026-07-18 15:04:56.789 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:04:56.853 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 21 timeslice metric results
+2026-07-18 15:05:01.556 - aiperf.metrics.types.osl_mismatch_metrics - WARNING - OSL mismatch: got 96 tokens (requested 442, diff -78.3%)
+2026-07-18 15:05:01.560 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:05:01.869 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:05:01.924 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 22 timeslice metric results
+2026-07-18 15:05:26.933 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:05:26.986 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 23 timeslice metric results
+2026-07-18 15:05:34.392 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:05:36.985 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:05:37.039 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 24 timeslice metric results
+2026-07-18 15:05:48.050 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:05:52.050 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:05:52.128 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 25 timeslice metric results
+2026-07-18 15:06:02.130 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:06:02.189 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 26 timeslice metric results
+2026-07-18 15:06:12.196 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:06:12.256 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 27 timeslice metric results
+2026-07-18 15:06:22.266 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:06:22.337 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 28 timeslice metric results
+2026-07-18 15:06:35.302 - aiperf.metrics.types.osl_mismatch_metrics - WARNING - OSL mismatch: got 148 tokens (requested 759, diff -80.5%)
+2026-07-18 15:06:35.308 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:06:37.353 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:06:37.418 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 29 timeslice metric results
+2026-07-18 15:07:02.426 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:07:02.490 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 30 timeslice metric results
+2026-07-18 15:07:17.499 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:07:17.572 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 31 timeslice metric results
+2026-07-18 15:07:27.940 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:07:32.582 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:07:32.662 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 32 timeslice metric results
+2026-07-18 15:07:42.101 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:07:42.674 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:07:42.759 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 33 timeslice metric results
+2026-07-18 15:07:59.078 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:08:02.299 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:08:02.766 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:08:02.859 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 35 timeslice metric results
+2026-07-18 15:08:11.981 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:08:12.865 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:08:12.950 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 36 timeslice metric results
+2026-07-18 15:08:28.203 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:08:32.958 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:08:33.046 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 37 timeslice metric results
+2026-07-18 15:08:38.052 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:08:38.144 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 38 timeslice metric results
+2026-07-18 15:08:53.149 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:08:53.269 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 39 timeslice metric results
+2026-07-18 15:08:58.279 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:08:58.365 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 40 timeslice metric results
+2026-07-18 15:09:08.369 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:09:08.478 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 41 timeslice metric results
+2026-07-18 15:09:16.357 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:09:18.485 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:09:18.589 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 42 timeslice metric results
+2026-07-18 15:09:19.922 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:09:23.593 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:09:23.717 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 43 timeslice metric results
+2026-07-18 15:09:28.722 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:09:28.965 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 44 timeslice metric results
+2026-07-18 15:09:33.972 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:09:34.132 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 45 timeslice metric results
+2026-07-18 15:09:39.141 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:09:39.245 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 45 timeslice metric results
+2026-07-18 15:09:49.249 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:09:49.357 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 47 timeslice metric results
+2026-07-18 15:10:04.374 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:10:04.489 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 48 timeslice metric results
+2026-07-18 15:10:12.469 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:10:14.504 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:10:14.639 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 50 timeslice metric results
+2026-07-18 15:10:19.646 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:10:19.767 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 51 timeslice metric results
+2026-07-18 15:10:35.378 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:10:39.776 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:10:39.895 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 52 timeslice metric results
+2026-07-18 15:10:54.901 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:10:55.018 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 53 timeslice metric results
+2026-07-18 15:11:40.023 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:11:40.147 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 54 timeslice metric results
+2026-07-18 15:11:44.356 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:11:45.162 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:11:45.291 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 55 timeslice metric results
+2026-07-18 15:11:59.969 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:12:00.298 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:12:00.448 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 57 timeslice metric results
+2026-07-18 15:12:15.452 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:12:15.591 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 58 timeslice metric results
+2026-07-18 15:12:30.600 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:12:30.734 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 59 timeslice metric results
+2026-07-18 15:12:40.739 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:12:40.918 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 60 timeslice metric results
+2026-07-18 15:12:45.923 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:12:46.115 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 60 timeslice metric results
+2026-07-18 15:12:51.123 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:12:51.292 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 61 timeslice metric results
+2026-07-18 15:12:55.886 - opentelemetry.sdk.metrics._internal.instrument - WARNING - Record amount must be non-negative on Histogram aiperf.osl_mismatch_diff_pct.
+2026-07-18 15:12:56.302 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:12:56.495 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 62 timeslice metric results
+2026-07-18 15:13:36.506 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:13:36.652 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 63 timeslice metric results
+2026-07-18 15:13:39.828 - PhaseRunner - NOTICE - Phase profiling sending complete | sent=72, completed=71, in_flight=1 | sessions: sent=72, completed=71
+2026-07-18 15:13:39.835 - records_manager - INFO - Sent 72 requests. Waiting for all to complete...
+2026-07-18 15:13:46.881 - PhaseRunner - NOTICE - Phase profiling complete | completed=72, cancelled=0, errors=0 | sessions: completed=72, cancelled=0 | elapsed=890.97s
+2026-07-18 15:13:46.882 - PhaseOrchestrator_f6c093f2 - NOTICE - All credits completed
+2026-07-18 15:13:46.882 - records_manager - INFO - Received CREDIT_PHASE_COMPLETE message, Phase complete: PhaseRecordsStats(phase=CreditPhase.PROFILING, start_ns=1784375935907227552, sent_end_ns=1784376819824131842, requests_end_ns=1784376826881086618, total_expected_requests=72, expected_duration_sec=None, expected_num_sessions=None, expected_grace_period_sec=None, final_requests_sent=None, final_requests_completed=72, final_requests_cancelled=0, final_request_errors=0, final_sent_sessions=None, final_completed_sessions=None, final_cancelled_sessions=None, timeout_triggered=False, grace_period_timeout_triggered=False, was_cancelled=False, records_end_ns=None, success_records=71, error_records=0)
+2026-07-18 15:13:46.882 - records_manager - NOTICE - All requests have completed, please wait for the results to be processed (currently 71 of 72 records processed)...
+2026-07-18 15:13:46.883 - records_manager - INFO - All credits complete, please wait for the results to be processed...
+2026-07-18 15:13:46.885 - system_controller - INFO - Received credits complete from 'timing_manager'
+2026-07-18 15:13:46.890 - records_manager - INFO - Processed 72 valid requests and 0 errors (72 total).
+2026-07-18 15:13:46.892 - records_manager - INFO - Received all records, processing now...
+2026-07-18 15:13:46.896 - records_manager - INFO - Waiting 2.0s for server metrics flush period...
+2026-07-18 15:13:46.896 - server_metrics_manager - INFO - Server Metrics: Profiling complete, capturing final metrics...
+2026-07-18 15:13:48.883 - records_manager - INFO - Processing records results...
+2026-07-18 15:13:48.912 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarizing timeslice metric results...
+2026-07-18 15:13:49.147 - TimesliceMetricResultsProcessor_5d46e594 - INFO - Summarized 64 timeslice metric results
+2026-07-18 15:13:49.170 - system_controller - INFO - Waiting for server metrics results...
+2026-07-18 15:13:49.171 - system_controller - INFO - Waiting for server metrics results...
+2026-07-18 15:13:49.209 - records_manager - INFO - _finalize_and_process_results completed
+2026-07-18 15:13:49.237 - system_controller - INFO - All results received, initiating shutdown
+2026-07-18 15:13:50.000 - ExporterManager - INFO - Exporting all records
+2026-07-18 15:13:50.281 - ExporterManager - INFO - Exporting console data

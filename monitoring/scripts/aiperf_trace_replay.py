@@ -85,6 +85,7 @@ def build_aiperf_command(artifact_dir: Path) -> List[str]:
         "--custom-dataset-type",
         "burst_gpt_trace",
         "--fixed-schedule",
+        "--concurrency", os.environ.get("MAX_CONCURRENCY", "100"),
         "--server-metrics-formats",
         "json",
         "csv",
