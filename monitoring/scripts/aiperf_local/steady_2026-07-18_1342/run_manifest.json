@@ -1,0 +1,14 @@
+{
+  "start_time": "2026-07-18T13:42:34+0300",
+  "scenario": "steady",
+  "inference_url": "http://localhost:8000",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "endpoint_type": "completions",
+  "trace_file": "steady_window.csv",
+  "trace_row_count": 72,
+  "artifact_dir": "aiperf_local/steady_2026-07-18_1342",
+  "slice_duration": "5",
+  "tokenizer": "",
+  "pushgateway_url": "http://localhost:9091/metrics/job/llm_bench_steady",
+  "enable_gpu_scrape": false
+}

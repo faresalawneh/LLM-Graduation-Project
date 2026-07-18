@@ -1,0 +1,120 @@
+2026-07-18 13:42:36.579 - GPUTelemetryJSONLWriter_4bddaa73 - INFO - GPU telemetry export enabled: /mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/monitoring/scripts/aiperf_local/steady_2026-07-18_1342/gpu_telemetry_export.jsonl
+2026-07-18 13:42:36.603 - OTelMetricsResultsProcessor_10d7f481 - INFO - Telemetry streaming is disabled (set --otel-url and/or --mlflow-tracking-uri to enable)
+2026-07-18 13:42:36.603 - records_manager - INFO - OTel metrics streamer is disabled and will not be used: Telemetry streaming is disabled (set --otel-url and/or --mlflow-tracking-uri to enable)
+2026-07-18 13:42:36.606 - RecordExportResultsProcessor_7b160239 - INFO - Record metrics export enabled: /mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/monitoring/scripts/aiperf_local/steady_2026-07-18_1342/profile_export.jsonl
+2026-07-18 13:42:36.638 - server_metrics_manager - INFO - Server Metrics: Discovered 1 endpoints: ['http://localhost:8000/metrics']
+2026-07-18 13:42:36.732 - ServerMetricsJSONLWriter_93814bb2 - INFO - Server metrics JSONL export enabled: /mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/monitoring/scripts/aiperf_local/steady_2026-07-18_1342/server_metrics_export.jsonl
+2026-07-18 13:42:36.766 - system_controller - INFO - Registered Worker Manager (id: 'worker_manager')
+2026-07-18 13:42:36.767 - system_controller - INFO - Registered Dataset Manager (id: 'dataset_manager')
+2026-07-18 13:42:36.768 - system_controller - INFO - Registered Gpu Telemetry Manager (id: 'gpu_telemetry_manager')
+2026-07-18 13:42:36.772 - system_controller - INFO - Registered Server Metrics Manager (id: 'server_metrics_manager')
+2026-07-18 13:42:36.915 - system_controller - INFO - Registered Timing Manager (id: 'timing_manager')
+2026-07-18 13:42:36.947 - system_controller - INFO - Registered Records Manager (id: 'records_manager')
+2026-07-18 13:42:36.959 - system_controller - INFO - Registered Record Processor (id: 'record_processor_9666ccbb')
+2026-07-18 13:42:36.960 - system_controller - INFO - Registered Record Processor (id: 'record_processor_465fe3ab')
+2026-07-18 13:42:37.093 - system_controller - INFO - AIPerf System is CONFIGURING
+2026-07-18 13:42:37.094 - system_controller - INFO - Configuring all services to start profiling
+2026-07-18 13:42:37.096 - timing_manager - INFO - Waiting for dataset to be configured before configuring timing
+2026-07-18 13:42:37.097 - InferenceResultParser_47089132 - INFO - Configuring tokenizers for inference result parser (resolve_alias: True)
+2026-07-18 13:42:37.097 - dataset_manager - INFO - Configuring tokenizer(s) for dataset manager
+2026-07-18 13:42:37.100 - InferenceResultParser_28d73bc8 - INFO - Configuring tokenizers for inference result parser (resolve_alias: True)
+2026-07-18 13:42:37.144 - server_metrics_manager - INFO - Server Metrics: Capturing baseline metrics...
+2026-07-18 13:42:37.154 - gpu_telemetry_manager - WARNING - GPU Telemetry: http://localhost:9400/metrics is not reachable
+2026-07-18 13:42:37.162 - gpu_telemetry_manager - WARNING - GPU Telemetry: http://localhost:9401/metrics is not reachable
+2026-07-18 13:42:37.190 - system_controller - INFO - Server metrics enabled - 1/1 endpoint(s) reachable.
+2026-07-18 13:42:37.192 - system_controller - INFO - DCGM telemetry skipped: no DCGM endpoints reachable
+2026-07-18 13:42:37.254 - system_controller - INFO - Registered Worker (id: 'worker_3855b3b4')
+2026-07-18 13:42:37.348 - system_controller - INFO - Registered Worker (id: 'worker_a1da462a')
+2026-07-18 13:42:37.348 - system_controller - INFO - Registered Worker (id: 'worker_ba330ae9')
+2026-07-18 13:42:37.349 - system_controller - INFO - Registered Worker (id: 'worker_c4e371bc')
+2026-07-18 13:42:37.350 - system_controller - INFO - Registered Worker (id: 'worker_a9c7e90c')
+2026-07-18 13:42:37.351 - system_controller - INFO - Registered Worker (id: 'worker_86014ce9')
+2026-07-18 13:42:37.357 - system_controller - INFO - Registered Worker (id: 'worker_8ac19bea')
+2026-07-18 13:42:37.380 - system_controller - INFO - Registered Worker (id: 'worker_daf87535')
+2026-07-18 13:42:39.930 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 13:42:39.930 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 13:42:39.931 - huggingface_hub.utils._http - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-07-18 13:42:39.931 - huggingface_hub.utils._http - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-07-18 13:42:39.958 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 13:42:39.959 - huggingface_hub.utils._http - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-07-18 13:42:39.960 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/config.json "HTTP/1.1 200 OK"
+2026-07-18 13:42:39.960 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/config.json "HTTP/1.1 200 OK"
+2026-07-18 13:42:39.985 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/config.json "HTTP/1.1 200 OK"
+2026-07-18 13:42:40.132 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 13:42:40.132 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 13:42:40.155 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-07-18 13:42:40.161 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-07-18 13:42:40.163 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-07-18 13:42:40.181 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-07-18 13:42:40.332 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-07-18 13:42:40.333 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-07-18 13:42:40.346 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-07-18 13:42:40.496 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-07-18 13:42:40.501 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-07-18 13:42:40.505 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-07-18 13:42:41.052 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct "HTTP/1.1 200 OK"
+2026-07-18 13:42:41.061 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct "HTTP/1.1 200 OK"
+2026-07-18 13:42:41.063 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct "HTTP/1.1 200 OK"
+2026-07-18 13:42:41.077 - dataset_manager - INFO - Tokenizer(s) configured in 3.98 seconds
+2026-07-18 13:42:41.077 - InferenceResultParser_47089132 - INFO - Initialized tokenizers: {'Qwen/Qwen2.5-0.5B-Instruct': {'class': 'Qwen2Tokenizer', 'name_or_path': 'Qwen/Qwen2.5-0.5B-Instruct'}} in 3.98 seconds
+2026-07-18 13:42:41.077 - InferenceResultParser_28d73bc8 - INFO - Initialized tokenizers: {'Qwen/Qwen2.5-0.5B-Instruct': {'class': 'Qwen2Tokenizer', 'name_or_path': 'Qwen/Qwen2.5-0.5B-Instruct'}} in 3.97 seconds
+2026-07-18 13:42:41.078 - dataset_manager - INFO - Configuring dataset for dataset_manager
+2026-07-18 13:42:41.610 - CustomDatasetComposer - INFO - Using explicit dataset format: burst_gpt_trace
+2026-07-18 13:42:41.642 - MemoryMapDatasetBackingStore_061e29df - INFO - Memory-mapped backing store initialized (streaming to /tmp/aiperf_mmap_5f9b41f7fd19/dataset.dat)
+2026-07-18 13:42:41.650 - MemoryMapDatasetBackingStore_061e29df - INFO - Data file finalized: 72 conversations, 0.32 MB
+2026-07-18 13:42:41.651 - MemoryMapDatasetBackingStore_061e29df - INFO - Index file created: /tmp/aiperf_mmap_5f9b41f7fd19/index.dat
+2026-07-18 13:42:41.652 - dataset_manager - INFO - Backing store finalized: client_type=DatasetClientStoreType.MEMORY_MAP data_file_path=PosixPath('/tmp/aiperf_mmap_5f9b41f7fd19/dataset.dat') index_file_path=PosixPath('/tmp/aiperf_mmap_5f9b41f7fd19/index.dat') conversation_count=72 total_size_bytes=338154 compressed_data_file_path=None compressed_index_file_path=None compressed_size_bytes=0
+2026-07-18 13:42:41.653 - dataset_manager - INFO - sampling strategy: sequential, unique conversations: 72, unique turn count: 72
+2026-07-18 13:42:41.666 - PhaseOrchestrator_3f7754f0 - INFO - Initialized 1 phase(s): ['Profiling']
+2026-07-18 13:42:41.668 - dataset_manager - INFO - Generating inputs.json file at /mnt/c/Users/alawn/Documents/GitHub/LLM-Graduation-Project/monitoring/scripts/aiperf_local/steady_2026-07-18_1342/inputs.json
+2026-07-18 13:42:41.681 - dataset_manager - INFO - inputs.json file generated in 0.01 seconds
+2026-07-18 13:42:41.814 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:42:41.814 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 0 timeslice metric results
+2026-07-18 13:42:41.822 - dataset_manager - INFO - Dataset client initialized and freed 72 conversations from memory
+2026-07-18 13:42:41.823 - dataset_manager - INFO - Dataset configured in 0.74 seconds
+2026-07-18 13:42:41.825 - system_controller - INFO - All services configured in 4.73 seconds
+2026-07-18 13:42:41.825 - system_controller - INFO - AIPerf System is CONFIGURED
+2026-07-18 13:42:41.827 - server_metrics_manager - INFO - Server Metrics: Started 1 collector(s) successfully
+2026-07-18 13:42:41.828 - FixedScheduleTiming - INFO - Built schedule with 72 timestamps, zero_ms=19494908000, auto_offset=True
+2026-07-18 13:42:41.829 - PhaseRunner - NOTICE - Phase profiling started | target: 72 requests, 72 sessions
+2026-07-18 13:42:41.830 - system_controller - INFO - All services started profiling successfully
+2026-07-18 13:42:41.830 - system_controller - INFO - AIPerf System is PROFILING
+2026-07-18 13:42:41.831 - records_manager - INFO - Credit phase start: profiling
+2026-07-18 13:42:46.850 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:42:46.852 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 1 timeslice metric results
+2026-07-18 13:43:06.846 - AioHttpClient - ERROR - Error in aiohttp request: ClientConnectorError(ConnectionKey(host='localhost', port=8000, is_ssl=False, ssl=True, proxy=None, proxy_auth=None, proxy_headers_hash=None), ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 8000)"))
+2026-07-18 13:43:11.849 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:43:11.851 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 2 timeslice metric results
+2026-07-18 13:43:16.871 - AioHttpClient - ERROR - Error in aiohttp request: ClientConnectorError(ConnectionKey(host='localhost', port=8000, is_ssl=False, ssl=True, proxy=None, proxy_auth=None, proxy_headers_hash=None), ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 8000)"))
+2026-07-18 13:43:21.852 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:43:21.854 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 3 timeslice metric results
+2026-07-18 13:43:51.863 - AioHttpClient - ERROR - Error in aiohttp request: ClientConnectorError(ConnectionKey(host='localhost', port=8000, is_ssl=False, ssl=True, proxy=None, proxy_auth=None, proxy_headers_hash=None), ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 8000)"))
+2026-07-18 13:43:56.851 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:43:56.853 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 4 timeslice metric results
+2026-07-18 13:44:36.826 - AioHttpClient - ERROR - Error in aiohttp request: ClientConnectorError(ConnectionKey(host='localhost', port=8000, is_ssl=False, ssl=True, proxy=None, proxy_auth=None, proxy_headers_hash=None), ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 8000)"))
+2026-07-18 13:44:36.852 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:44:36.856 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 5 timeslice metric results
+2026-07-18 13:44:42.826 - AioHttpClient - ERROR - Error in aiohttp request: ClientConnectorError(ConnectionKey(host='localhost', port=8000, is_ssl=False, ssl=True, proxy=None, proxy_auth=None, proxy_headers_hash=None), ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 8000)"))
+2026-07-18 13:44:46.861 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:44:46.867 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 6 timeslice metric results
+2026-07-18 13:44:52.830 - AioHttpClient - ERROR - Error in aiohttp request: ClientConnectorError(ConnectionKey(host='localhost', port=8000, is_ssl=False, ssl=True, proxy=None, proxy_auth=None, proxy_headers_hash=None), ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 8000)"))
+2026-07-18 13:44:54.825 - AioHttpClient - ERROR - Error in aiohttp request: ClientConnectorError(ConnectionKey(host='localhost', port=8000, is_ssl=False, ssl=True, proxy=None, proxy_auth=None, proxy_headers_hash=None), ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 8000)"))
+2026-07-18 13:44:55.819 - AioHttpClient - ERROR - Error in aiohttp request: ClientConnectorError(ConnectionKey(host='localhost', port=8000, is_ssl=False, ssl=True, proxy=None, proxy_auth=None, proxy_headers_hash=None), ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 8000)"))
+2026-07-18 13:44:56.873 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:44:56.879 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 8 timeslice metric results
+2026-07-18 13:45:11.795 - AioHttpClient - ERROR - Error in aiohttp request: ClientConnectorError(ConnectionKey(host='localhost', port=8000, is_ssl=False, ssl=True, proxy=None, proxy_auth=None, proxy_headers_hash=None), ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 8000)"))
+2026-07-18 13:45:11.869 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:45:11.874 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 9 timeslice metric results
+2026-07-18 13:45:25.469 - system_controller - WARNING - Signal 2 received, initiating graceful shutdown
+2026-07-18 13:45:25.474 - system_controller - WARNING - Graceful shutdown requested (signal 2)
+2026-07-18 13:45:25.477 - records_manager - WARNING - Received profile cancel command: {"message_type":"command","service_id":"system_controller","command":"profile_cancel","command_id":"3461590c-dc9b-4a3e-855c-fce1eccd552d"}
+2026-07-18 13:45:25.479 - timing_manager - WARNING - Received profile cancel command: {"message_type":"command","service_id":"system_controller","command":"profile_cancel","command_id":"3461590c-dc9b-4a3e-855c-fce1eccd552d"}
+2026-07-18 13:45:25.480 - records_manager - INFO - Processing records results...
+2026-07-18 13:45:25.481 - PhaseOrchestrator_3f7754f0 - WARNING - Cancelling phase orchestrator
+2026-07-18 13:45:25.482 - timing_manager - INFO - Phase orchestrator cancelled
+2026-07-18 13:45:25.482 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarizing timeslice metric results...
+2026-07-18 13:45:25.485 - TimesliceMetricResultsProcessor_ef1a51e5 - INFO - Summarized 9 timeslice metric results
+2026-07-18 13:45:25.485 - records_manager - WARNING - Skipping efficiency metrics for phase profiling: start_ns=1784371361829420002, requests_end_ns=None
+2026-07-18 13:45:25.505 - PhaseRunner - NOTICE - Phase profiling sending complete | sent=10, completed=10, in_flight=0 | sessions: sent=10, completed=10
+2026-07-18 13:45:25.516 - PhaseOrchestrator_3f7754f0 - NOTICE - All credits completed
+2026-07-18 13:45:26.106 - system_controller - ERROR - All 10 inference request(s) failed; no successful responses were collected.
