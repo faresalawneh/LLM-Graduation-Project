@@ -11,7 +11,7 @@ SCENARIO="${1:-steady}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-export MODEL="Qwen/Qwen2.5-0.5B-Instruct"
+export MODEL="Qwen/Qwen2.5-1.5B-Instruct"
 export INFERENCE_URL="http://localhost:8000"
 export ENDPOINT_TYPE="completions"
 export OTEL_URL="http://localhost:4318/v1/metrics"
