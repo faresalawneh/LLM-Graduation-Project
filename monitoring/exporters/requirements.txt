@@ -1,2 +1,0 @@
-nvidia-ml-py==12.575.51
-prometheus_client==0.23.1
