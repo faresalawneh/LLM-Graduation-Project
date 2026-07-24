@@ -8,3 +8,5 @@ venv
 .env
 artifacts/
 monitoring/scripts/aiperf_local/
+monitoring/scripts/burst_smoke.csv
+.vscode/

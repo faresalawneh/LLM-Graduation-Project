@@ -57,8 +57,8 @@ PROMETHEUS_URL  = os.getenv("PROMETHEUS_URL", "http://localhost:9090") + "/api/v
 # Laptop has no DCGM exporter, so GPU scraping is off unless explicitly enabled.
 ENABLE_GPU_SCRAPE = os.getenv("ENABLE_GPU_SCRAPE", "0") == "1"
 GPU_QUERIES = [
-    'DCGM_FI_DEV_SM_CLOCK{gpu="1"}',
-    'DCGM_FI_DEV_FB_USED{gpu="1"}',
+    'DCGM_FI_DEV_SM_CLOCK{gpu="0"}',
+    'DCGM_FI_DEV_FB_USED{gpu="0"}',
     "vllm:num_requests_waiting",
     "vllm:gpu_cache_usage_perc",
 ]
