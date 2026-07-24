@@ -110,13 +110,13 @@ services:
       - local
     command:
       - --model
-      - Qwen/Qwen2.5-0.5B-Instruct
+      - Qwen/Qwen2.5-1.5B-Instruct
       - --dtype
       - float16
       - --max-model-len
       - "4096"
       - --gpu-memory-utilization
-      - "0.75"
+      - "0.85"
     deploy:
       resources:
         reservations:
@@ -126,6 +126,7 @@ services:
               capabilities: [gpu]
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
+      - VLLM_USE_V1=0
     volumes:
       - hf_cache:/root/.cache/huggingface
     ports:

@@ -6,3 +6,7 @@ __pycache__/
 __pycache__
 venv
 .env
+artifacts/
+monitoring/scripts/aiperf_local/
+monitoring/scripts/burst_smoke.csv
+.vscode/
