@@ -2,7 +2,7 @@ name: LLM Observability API CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "waqfi_experiments" ]
   pull_request:
     branches: [ "main" ]
 
@@ -16,15 +16,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
           pip install --upgrade pip
+          pip install -r requirements.txt
           pip install -r api/requirements.txt
-          pip install -r monitoring/exporters/requirements.txt
 
       - name: Run Pytest
+        env:
+          PYTHONPATH: api
         run: pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v --disable-warnings
 
       - name: Run Security Scan
@@ -37,6 +39,38 @@ jobs:
             --entrypoint promtool \
             prom/prometheus:latest \
             check config /prometheus.yml
+
+  build-images-dryrun:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref != 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image_name: llm-observability-api
+            context: .
+            dockerfile: ./api/Dockerfile
+          - image_name: llm-observability-grafana
+            context: .
+            dockerfile: ./docker/grafana/Dockerfile
+          - image_name: llm-observability-prometheus
+            context: .
+            dockerfile: ./docker/prometheus/Dockerfile
+          - image_name: llm-observability-pushgateway
+            context: .
+            dockerfile: ./docker/pushgateway/Dockerfile
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          tags: ${{ matrix.image_name }}:ci-test
 
   publish-images:
     runs-on: ubuntu-latest
