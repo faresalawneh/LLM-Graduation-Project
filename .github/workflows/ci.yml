@@ -27,8 +27,7 @@ jobs:
       - name: Run Pytest
         env:
           PYTHONPATH: api
-        run: pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v --disable-warnings
-
+        run: pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v
       - name: Run Security Scan
         run: bandit -r api/app.py
 
