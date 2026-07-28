@@ -3,3 +3,7 @@
 *.csv filter=lfs diff=lfs merge=lfs -text
 *.sh text eol=lf
 *.py text eol=lf
+*.jsonl filter=lfs diff=lfs merge=lfs -text
+inputs.json filter=lfs diff=lfs merge=lfs -text
+*_timeslices.json filter=lfs diff=lfs merge=lfs -text
+server_metrics_export.json filter=lfs diff=lfs merge=lfs -text
