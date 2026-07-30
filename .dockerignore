@@ -17,3 +17,6 @@ monitoring/**
 **/*.pyc
 **/*.pyo
 **/*.pyd
+# Local experiment output - never needed in an image build
+artifacts
+mlruns
