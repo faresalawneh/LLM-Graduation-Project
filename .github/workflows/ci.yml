@@ -59,6 +59,9 @@ jobs:
           - image_name: llm-observability-pushgateway
             context: .
             dockerfile: ./docker/pushgateway/Dockerfile
+          - image_name: llm-observability-nvml-exporter
+            context: .
+            dockerfile: ./monitoring/exporters/Dockerfile.nvml
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -91,6 +94,9 @@ jobs:
           - image_name: llm-observability-pushgateway
             context: .
             dockerfile: ./docker/pushgateway/Dockerfile
+          - image_name: llm-observability-nvml-exporter
+            context: .
+            dockerfile: ./monitoring/exporters/Dockerfile.nvml
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

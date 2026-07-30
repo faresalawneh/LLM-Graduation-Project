@@ -30,8 +30,8 @@ services:
   # profiles (local vs server), so both binding 9400 never conflicts.
   nvml-exporter:
     build:
-      context: ./exporters
-      dockerfile: Dockerfile.nvml
+      context: ..
+      dockerfile: monitoring/exporters/Dockerfile.nvml
     container_name: nvml-exporter
     restart: unless-stopped
     profiles:
