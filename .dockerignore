@@ -13,6 +13,8 @@ monitoring/**
 !monitoring/grafana/provisioning/**
 !monitoring/prometheus/
 !monitoring/prometheus/prometheus.yml
+!monitoring/exporters/
+!monitoring/exporters/nvml_exporter.py
 **/__pycache__
 **/*.pyc
 **/*.pyo
