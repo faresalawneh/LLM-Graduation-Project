@@ -19,7 +19,13 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-import mlflow
+try:
+    import mlflow
+except ImportError as exc:  # pragma: no cover
+    raise SystemExit(
+        "mlflow is not installed. Run:\n"
+        "    pip install -r requirements-experiments.txt"
+    ) from exc
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger("mlflow_log_run")
@@ -83,7 +89,7 @@ def git_sha(repo_root: Path) -> str:
     """Return the current commit SHA, or 'unknown' outside a git tree."""
     try:
         out = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-parse", "--short", "HEAD"],
+            ["git", "-C", str(repo_root), "rev-parse", "--short", "HEAD"],  # nosec B603 - fixed argv, no shell, no user input
             capture_output=True, text=True, timeout=10, check=True,
         )
         return out.stdout.strip()
@@ -96,7 +102,7 @@ def docker_state(container: str = "vllm") -> dict[str, Any]:
     fmt = "{{.RestartCount}}|{{.State.ExitCode}}|{{.State.OOMKilled}}|{{.State.Status}}"
     try:
         out = subprocess.run(
-            ["docker", "inspect", container, "--format", fmt],
+            ["docker", "inspect", container, "--format", fmt],  # nosec B603 - fixed argv, no shell, no user input
             capture_output=True, text=True, timeout=15, check=True,
         )
         restarts, exit_code, oom, status = out.stdout.strip().split("|")
