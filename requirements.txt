@@ -132,3 +132,6 @@ zstandard==0.25.0
 nvidia-ml-py==12.575.51
 prometheus_client==0.23.1
 
+mlflow==3.14.0
+pyarrow==24.0.0
+protobuf==6.33.6
