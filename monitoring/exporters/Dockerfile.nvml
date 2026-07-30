@@ -1,12 +1,13 @@
 # NVML exporter for WSL2/laptop. No CUDA toolkit: in WSL2 the driver libs
 # (libnvidia-ml.so) are bind-mounted from the host by the NVIDIA container
 # runtime (NVIDIA_DRIVER_CAPABILITIES=utility).
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY nvml_exporter.py .
+COPY monitoring/exporters/nvml_exporter.py .
 
 EXPOSE 9400
 CMD ["python", "nvml_exporter.py"]
+
