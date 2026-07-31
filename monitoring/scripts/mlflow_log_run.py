@@ -130,6 +130,12 @@ def main() -> int:
     parser.add_argument("artifact_dir", type=Path)
     parser.add_argument("--stack-state", type=Path, default=None)
     parser.add_argument("--experiment", default="inferscope-gp2")
+    parser.add_argument(
+        "--run-type",
+        default=None,
+        help="Tag the run (e.g. smoke, historical). Auto-set to 'smoke' "
+             "when trace_row_count < 1000.",
+    )
     parser.add_argument("--tracking-uri", default=None)
     args = parser.parse_args()
 
@@ -194,7 +200,10 @@ def main() -> int:
             if candidate.exists():
                 mlflow.log_artifact(str(candidate))
 
+        trace = str(manifest.get("trace_file") or "")
+        run_type = args.run_type or ("smoke" if "smoke" in trace else "full")
         mlflow.set_tags({
+            "run_type": run_type,
             "scenario": scenario,
             "source": "aiperf_trace_replay",
             "host": "msi-rtx5060-wsl2",
