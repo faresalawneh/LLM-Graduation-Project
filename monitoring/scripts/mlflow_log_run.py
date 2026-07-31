@@ -32,14 +32,11 @@ log = logging.getLogger("mlflow_log_run")
 
 _UNSAFE = re.compile(r"[^0-9a-zA-Z_\-. :/]+")
 
-# Only these are copied into the MLflow store; the multi-MB exports stay on disk
-# and are referenced by path via the artifact_dir param.
-SMALL_ARTIFACTS = (
-    "run_manifest.json",
-    "profile_export_aiperf.csv",
-    "server_metrics_export.csv",
-    "profile_export_aiperf.json",
-)
+# Every file in the run directory is logged, so each MLflow run is
+# self-contained. mlruns/ is gitignored, so this never reaches the repo.
+# Add filenames here to exclude them.
+SKIP_ARTIFACTS: frozenset[str] = frozenset()
+
 
 
 def sanitize(name: str) -> str:
@@ -195,10 +192,15 @@ def main() -> int:
         if metrics:
             mlflow.log_metrics(metrics)
 
-        for name in SMALL_ARTIFACTS:
-            candidate = run_dir / name
-            if candidate.exists():
-                mlflow.log_artifact(str(candidate))
+        logged_bytes = 0
+        for candidate in sorted(run_dir.iterdir()):
+            if not candidate.is_file() or candidate.name in SKIP_ARTIFACTS:
+                continue
+            mlflow.log_artifact(str(candidate))
+            logged_bytes += candidate.stat().st_size
+        log.info("logged %d artifact file(s), %.1f MB",
+                 sum(1 for f in run_dir.iterdir() if f.is_file()),
+                 logged_bytes / 1e6)
 
         trace = str(manifest.get("trace_file") or "")
         run_type = args.run_type or ("smoke" if "smoke" in trace else "full")
