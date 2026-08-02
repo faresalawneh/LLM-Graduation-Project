@@ -12,3 +12,8 @@ monitoring/scripts/burst_smoke.csv
 .vscode/
 mlruns/
 monitoring/logs/
+
+# experiment protocol outputs (large, machine-specific)
+protocol_logs/
+protocol_*.log
+*.sh.bak
