@@ -15,6 +15,7 @@ rejects it, so one unsupported field never kills the whole scrape.
 
 import atexit
 import logging
+import socket
 import os
 import time
 
@@ -29,7 +30,10 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("nvml_exporter")
 
-LABEL_NAMES = ["gpu", "UUID", "modelName", "source"]
+LABEL_NAMES = ["gpu", "UUID", "modelName", "source", "Hostname"]
+# DCGM emits Hostname on every metric; AIPerf 0.11+ requires it and will
+# hang on "Waiting for telemetry results..." if it is absent.
+HOSTNAME = os.getenv("NVML_EXPORTER_HOSTNAME") or socket.gethostname()
 
 
 def _decode(value):
@@ -80,6 +84,7 @@ class NVMLCollector:
                 _decode(pynvml.nvmlDeviceGetUUID(handle)),
                 _decode(pynvml.nvmlDeviceGetName(handle)),
                 "nvml",
+                HOSTNAME,
             ]
             for name, _, reader in self._field_readers():
                 try:

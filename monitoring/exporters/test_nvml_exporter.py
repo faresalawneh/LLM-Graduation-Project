@@ -94,7 +94,7 @@ def test_labels_match_dcgm_contract(exporter):
     module, _ = exporter
     for family in _collect(module):
         for sample in family.samples:
-            assert set(sample.labels) == {"gpu", "UUID", "modelName", "source"}
+            assert set(sample.labels) == {"gpu", "UUID", "modelName", "source", "Hostname"}
             assert sample.labels["gpu"] == "0"
             assert sample.labels["UUID"] == "GPU-fake-uuid"
             assert sample.labels["modelName"] == "NVIDIA GeForce RTX 5060"

@@ -46,6 +46,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=utility
+      - NVML_EXPORTER_HOSTNAME=${NVML_EXPORTER_HOSTNAME:-MRalwaqfi}
     ports:
       - "9400:9400"
     networks:
