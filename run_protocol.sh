@@ -24,11 +24,18 @@ TEMP_TOLERANCE_C="${TEMP_TOLERANCE_C:-3}"
 BASELINE_FILE="${PROTO_DIR}/baseline_temp_c"
 
 # step | scenario | kill_time_s (0 = no fault)
+#
+# Kill times are 400s and 600s only. Earlier injections (200s into a ~900s
+# replay) leave more in-flight records partially written in AIPerf's
+# memory-mapped dataset; the client then cannot deserialise them, never
+# reaches its expected record count, and waits indefinitely. Injections at
+# 200s hung every time we tried them. Even at 400s only one attempt in
+# several completed.
 PLAN=(
   "1|steady|0"
   "2|burst|400"
   "3|burst|0"
-  "4|burst|200"
+  "4|burst|400"
   "5|steady|0"
   "6|burst|600"
   "7|burst|0"
