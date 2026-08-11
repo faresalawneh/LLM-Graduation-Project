@@ -277,8 +277,14 @@ def _finalize_watchdog(process, artifact_dir: Path) -> int:
                 process.wait(timeout=30)
             # reap orphaned children of the killed process only; a bare
             # `pkill -f aiperf` would also match this script's own cmdline
+            # AIPerf spawns a manager tree; -P kills direct children only and
+            # leaves ~20 grandchildren scraping. Match on process name instead.
             subprocess.run(  # nosec B603 - fixed argv, no shell
-                ["pkill", "-P", str(process.pid)], check=False, timeout=15,
+                ["pkill", "-TERM", "-x", "aiperf"], check=False, timeout=15,
+            )
+            time.sleep(5)
+            subprocess.run(  # nosec B603 - fixed argv, no shell
+                ["pkill", "-9", "-x", "aiperf"], check=False, timeout=15,
             )
             (artifact_dir / "RECOVERED").write_text(
                 "AIPerf finalisation did not complete; reaped after "
