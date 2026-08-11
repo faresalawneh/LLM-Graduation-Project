@@ -240,20 +240,6 @@ def capture_vllm_logs(artifact_dir: Path, phase: str, since: str = None) -> None
         log.warning("vLLM log capture (%s) failed: %s", phase, exc)
 
 
-def run_scenario(scenario: str, artifact_dir: Path) -> int:
-    artifact_dir.mkdir(parents=True, exist_ok=False)
-    write_run_manifest(artifact_dir, scenario)
-
-    stop_event = threading.Event()
-    gpu_thread = None
-    if ENABLE_GPU_SCRAPE:
-        gpu_thread = threading.Thread(
-            target=gpu_scrape_thread,
-            args=(stop_event, artifact_dir),
-            daemon=True,
-        )
-        gpu_thread.start()
-
 def _finalize_watchdog(process, artifact_dir: Path) -> int:
     """Wait for AIPerf, bounding the post-replay finalisation phase.
 
@@ -300,6 +286,20 @@ def _finalize_watchdog(process, artifact_dir: Path) -> int:
             )
             return -1
 
+
+def run_scenario(scenario: str, artifact_dir: Path) -> int:
+    artifact_dir.mkdir(parents=True, exist_ok=False)
+    write_run_manifest(artifact_dir, scenario)
+
+    stop_event = threading.Event()
+    gpu_thread = None
+    if ENABLE_GPU_SCRAPE:
+        gpu_thread = threading.Thread(
+            target=gpu_scrape_thread,
+            args=(stop_event, artifact_dir),
+            daemon=True,
+        )
+        gpu_thread.start()
 
     command = build_aiperf_command(artifact_dir)
     log.info("[%s] starting AIPerf: %s", scenario, " ".join(command))
