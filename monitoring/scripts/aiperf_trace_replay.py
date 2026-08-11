@@ -29,6 +29,7 @@ import logging
 import os
 import shutil
 import subprocess
+from contextlib import suppress
 import threading
 import time
 from pathlib import Path
@@ -75,6 +76,7 @@ GPU_SCRAPE_INTERVAL = float(os.getenv("GPU_SCRAPE_INTERVAL", "5"))
 CONCURRENCY = os.environ.get("MAX_CONCURRENCY", "20")
 VLLM_CONTAINER = os.getenv("VLLM_CONTAINER", "vllm")
 VLLM_LOG_TAIL = int(os.getenv("VLLM_LOG_TAIL", "2000"))
+AIPERF_FINALIZE_TIMEOUT = float(os.getenv("AIPERF_FINALIZE_TIMEOUT", "300"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("aiperf_trace_replay")
@@ -252,6 +254,53 @@ def run_scenario(scenario: str, artifact_dir: Path) -> int:
         )
         gpu_thread.start()
 
+def _finalize_watchdog(process, artifact_dir: Path) -> int:
+    """Wait for AIPerf, bounding the post-replay finalisation phase.
+
+    After a mid-replay engine kill AIPerf completes the replay but stalls
+    indefinitely awaiting in-flight responses that will never arrive, leaving
+    profile_export.jsonl complete and no aggregates written. Rather than wait,
+    the process tree is terminated once the record file stops growing and the
+    bound elapses; recover_aggregates.py reconstructs the aggregates.
+
+    Returns:
+        The process return code, or -1 if the run was reaped.
+    """
+    records = artifact_dir / "profile_export.jsonl"
+    last_size = -1
+    idle_since = None
+    while True:
+        try:
+            return process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pass
+        size = records.stat().st_size if records.exists() else 0
+        if size != last_size:
+            last_size, idle_since = size, time.monotonic()
+            continue
+        if idle_since is None:
+            idle_since = time.monotonic()
+        idle = time.monotonic() - idle_since
+        if idle >= AIPERF_FINALIZE_TIMEOUT:
+            log.warning(
+                "AIPerf idle %.0fs after last record (bound %.0fs); reaping",
+                idle, AIPERF_FINALIZE_TIMEOUT,
+            )
+            process.kill()
+            with suppress(Exception):
+                process.wait(timeout=30)
+            # reap orphaned children of the killed process only; a bare
+            # `pkill -f aiperf` would also match this script's own cmdline
+            subprocess.run(  # nosec B603 - fixed argv, no shell
+                ["pkill", "-P", str(process.pid)], check=False, timeout=15,
+            )
+            (artifact_dir / "RECOVERED").write_text(
+                "AIPerf finalisation did not complete; reaped after "
+                "{:.0f}s idle. Aggregates from recover_aggregates.py.\n".format(idle)
+            )
+            return -1
+
+
     command = build_aiperf_command(artifact_dir)
     log.info("[%s] starting AIPerf: %s", scenario, " ".join(command))
 
@@ -259,7 +308,7 @@ def run_scenario(scenario: str, artifact_dir: Path) -> int:
     run_start = time.strftime("%Y-%m-%dT%H:%M:%S")
     process = subprocess.Popen(command)
     try:
-        rc = process.wait()
+        rc = _finalize_watchdog(process, artifact_dir)
     finally:
         stop_event.set()
         capture_vllm_logs(artifact_dir, "run", since=run_start)
