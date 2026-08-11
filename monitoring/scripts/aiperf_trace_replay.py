@@ -73,6 +73,8 @@ GPU_QUERIES = [
 ]
 GPU_SCRAPE_INTERVAL = float(os.getenv("GPU_SCRAPE_INTERVAL", "5"))
 CONCURRENCY = os.environ.get("MAX_CONCURRENCY", "20")
+VLLM_CONTAINER = os.getenv("VLLM_CONTAINER", "vllm")
+VLLM_LOG_TAIL = int(os.getenv("VLLM_LOG_TAIL", "2000"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("aiperf_trace_replay")
@@ -195,6 +197,47 @@ def write_run_manifest(artifact_dir: Path, scenario: str) -> None:
         json.dump(manifest, f, indent=2)
 
 
+def capture_vllm_logs(artifact_dir: Path, phase: str, since: str = None) -> None:
+    """Snapshot the vLLM container log into the artifact directory.
+
+    The startup banner carries the KV block allocation ("# GPU blocks: N"),
+    which is unrecoverable after the fact. With restart:unless-stopped the
+    stream spans restarts, so a faulted run yields one banner per generation
+    in the post-run capture.
+
+    Non-following and timeout-bounded: `docker logs -f` re-streams the whole
+    history and has previously hung the harness.
+    """
+    dest = artifact_dir / "logs"
+    dest.mkdir(parents=True, exist_ok=True)
+    cmd = ["docker", "logs"]
+    if since:
+        cmd += ["--since", since]
+    else:
+        # unbounded `docker logs` returns the container's entire history
+        # (hundreds of MB on a long-lived container); the startup banner is
+        # within the last few hundred lines of the most recent generation.
+        cmd += ["--tail", str(VLLM_LOG_TAIL)]
+    cmd.append(VLLM_CONTAINER)
+    try:
+        out = subprocess.run(  # nosec B603 - fixed argv, no shell
+            cmd, capture_output=True, text=True, timeout=30, check=False,
+        )
+        text = out.stdout + out.stderr
+        (dest / "vllm_{}.log".format(phase)).write_text(text)
+        banners = [ln for ln in text.splitlines() if "GPU blocks" in ln]
+        if banners:
+            log.info("vLLM allocation banner(s) captured (%s): %d", phase, len(banners))
+        elif phase == "startup":
+            log.warning(
+                "no allocation banner in last %d lines: container predates the "
+                "tail window; block count for this generation is unrecorded",
+                VLLM_LOG_TAIL,
+            )
+    except (subprocess.SubprocessError, OSError) as exc:
+        log.warning("vLLM log capture (%s) failed: %s", phase, exc)
+
+
 def run_scenario(scenario: str, artifact_dir: Path) -> int:
     artifact_dir.mkdir(parents=True, exist_ok=False)
     write_run_manifest(artifact_dir, scenario)
@@ -212,11 +255,14 @@ def run_scenario(scenario: str, artifact_dir: Path) -> int:
     command = build_aiperf_command(artifact_dir)
     log.info("[%s] starting AIPerf: %s", scenario, " ".join(command))
 
+    capture_vllm_logs(artifact_dir, "startup")
+    run_start = time.strftime("%Y-%m-%dT%H:%M:%S")
     process = subprocess.Popen(command)
     try:
         rc = process.wait()
     finally:
         stop_event.set()
+        capture_vllm_logs(artifact_dir, "run", since=run_start)
     if gpu_thread is not None:
         gpu_thread.join(timeout=10)
     return rc
