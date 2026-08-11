@@ -59,10 +59,17 @@ ENABLE_GPU_SCRAPE = os.getenv("ENABLE_GPU_SCRAPE", "0") == "1"
 GPU_QUERIES = [
     'DCGM_FI_DEV_SM_CLOCK{gpu="0"}',
     'DCGM_FI_DEV_FB_USED{gpu="0"}',
+    'DCGM_FI_DEV_GPU_TEMP{gpu="0"}',
+    'DCGM_FI_DEV_POWER_USAGE{gpu="0"}',
+    'DCGM_FI_DEV_MEM_CLOCK{gpu="0"}',
+    'DCGM_FI_DEV_FB_FREE{gpu="0"}',
+    'DCGM_FI_DEV_FB_TOTAL{gpu="0"}',
     "vllm:num_requests_waiting",
+    "vllm:num_requests_running",
     "vllm:gpu_cache_usage_perc",
 ]
-GPU_SCRAPE_INTERVAL = 5
+GPU_SCRAPE_INTERVAL = float(os.getenv("GPU_SCRAPE_INTERVAL", "5"))
+CONCURRENCY = os.environ.get("MAX_CONCURRENCY", "20")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("aiperf_trace_replay")
@@ -85,7 +92,7 @@ def build_aiperf_command(artifact_dir: Path) -> List[str]:
         "--custom-dataset-type",
         "burst_gpt_trace",
         "--fixed-schedule",
-        "--concurrency", os.environ.get("MAX_CONCURRENCY", "100"),
+        "--concurrency", CONCURRENCY,
         "--server-metrics-formats",
         "json",
         "csv",
@@ -125,21 +132,23 @@ def query_prometheus(query: str):
 def gpu_scrape_thread(stop, artifact_dir):
     artifact_dir.mkdir(parents=True, exist_ok=True)
     path = artifact_dir / "gpu_telemetry.jsonl"
+    _missing_warned = set()
     with path.open("a") as f:
         while not stop.is_set():
+            t0 = time.monotonic()
             snap = {"timestamp": int(time.time())}
-            ok = True
             for q in GPU_QUERIES:
                 v = query_prometheus(q)
                 if v is None:
-                    ok = False
-                    log.warning("GPU scrape missing: %s", q)
-                    break
+                    if q not in _missing_warned:
+                        log.warning("GPU scrape missing (omitting field): %s", q)
+                        _missing_warned.add(q)
+                    continue
                 snap[q] = v
-            if ok:
+            if len(snap) > 1:
                 f.write(json.dumps(snap) + "\n")
                 f.flush()
-            stop.wait(GPU_SCRAPE_INTERVAL)
+            stop.wait(max(0.0, GPU_SCRAPE_INTERVAL - (time.monotonic() - t0)))
 
 
 # ── Scenario runner ───────────────────────────────────────────────────────────
@@ -147,6 +156,17 @@ def gpu_scrape_thread(stop, artifact_dir):
 def count_trace_rows(trace_file: Path) -> int:
     with trace_file.open() as f:
         return max(sum(1 for line in f if line.strip()) - 1, 0)  # minus header
+
+
+def _git_rev() -> str:
+    """Return the current harness commit, or "unknown" outside a git tree."""
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).resolve().parent, text=True, timeout=5
+        ).strip()
+    except Exception:
+        return "unknown"
 
 
 def write_run_manifest(artifact_dir: Path, scenario: str) -> None:
@@ -163,6 +183,10 @@ def write_run_manifest(artifact_dir: Path, scenario: str) -> None:
         "tokenizer": TOKENIZER,
         "enable_gpu_scrape": ENABLE_GPU_SCRAPE,
         "otel_url": OTEL_URL,
+        "concurrency": CONCURRENCY,
+        "gpu_scrape_interval": GPU_SCRAPE_INTERVAL,
+        "gpu_queries": GPU_QUERIES,
+        "harness_commit": _git_rev(),
     }
     with (artifact_dir / "run_manifest.json").open("w") as f:
         json.dump(manifest, f, indent=2)
