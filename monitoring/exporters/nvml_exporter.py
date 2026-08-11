@@ -67,6 +67,15 @@ class NVMLCollector:
              lambda h: pynvml.nvmlDeviceGetPowerUsage(h) / 1000.0),
             ("DCGM_FI_DEV_GPU_TEMP", "GPU temperature (C).",
              lambda h: float(pynvml.nvmlDeviceGetTemperature(h, pynvml.NVML_TEMPERATURE_GPU))),
+            ("NVML_DEV_PROC_COUNT", "Compute processes holding device memory.",
+             lambda h: float(len(pynvml.nvmlDeviceGetComputeRunningProcesses(h)))),
+            ("NVML_DEV_PROC_FB_USED", "Device memory held by compute processes (MiB).",
+             lambda h: float(sum(
+                 (proc.usedGpuMemory or 0)
+                 for proc in pynvml.nvmlDeviceGetComputeRunningProcesses(h)
+             ) // 1024**2)),
+            ("NVML_DEV_CLOCK_THROTTLE_REASONS", "Current clocks throttle reason bitmask.",
+             lambda h: float(pynvml.nvmlDeviceGetCurrentClocksThrottleReasons(h))),
         ]
 
     def collect(self):
