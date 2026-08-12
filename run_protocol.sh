@@ -38,19 +38,15 @@ BASELINE_FILE="${PROTO_DIR}/baseline_temp_c"
 # healthy and the run completes, so §V-E's preconditions are evaluable.
 # See docs/F2_INJECTION_DECISION.md.
 PLAN=(
-  "1|steady|0"
-  "2|burst|400"
-  "3|burst|0"
-  "4|burst|200"
-  "5|steady|0"
-  "6|burst|600"
+  "1|burst|400"
+  "2|burst|0"
+  "3|burst|200"
+  "4|burst|0"
+  "5|burst|600"
+  "6|burst|f2@450"
   "7|burst|0"
-  "8|burst|f2@450"
-  "9|steady|0"
-  "10|burst|400"
-  "11|burst|0"
-  "12|burst|f2@450"
-  "13|burst|0"
+  "8|burst|400"
+  "9|burst|f2@450"
 )
 
 mkdir -p "${PROTO_DIR}"
