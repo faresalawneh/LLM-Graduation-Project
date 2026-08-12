@@ -95,9 +95,9 @@ reap_aiperf() {
   n="$(pgrep -c aiperf 2>/dev/null || echo 0)"
   [ "${n}" -eq 0 ] && return 0
   say "reaping ${n} orphaned aiperf process(es)"
-  pkill -TERM -x aiperf 2>/dev/null || true
+  pkill -TERM -f "aiperf " 2>/dev/null || true
   sleep 5
-  pkill -9 -x aiperf 2>/dev/null || true
+  pkill -9 -f "aiperf " 2>/dev/null || true
   sleep 3
   say "aiperf processes remaining: $(pgrep -c aiperf 2>/dev/null || echo 0)"
 }
@@ -245,7 +245,7 @@ run_step() {
   set -e
   if [ "${rc}" -eq 124 ] || [ "${rc}" -eq 137 ]; then
     say "STEP ${step} TIMED OUT after ${RUN_TIMEOUT_S:-2400}s - killing stragglers"
-    pkill -9 -x aiperf 2>/dev/null || true
+    pkill -9 -f "aiperf " 2>/dev/null || true
     sleep 10
   fi
   echo "${rc}" > "${pre}/exit_code"

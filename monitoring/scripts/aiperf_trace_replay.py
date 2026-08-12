@@ -76,7 +76,11 @@ GPU_SCRAPE_INTERVAL = float(os.getenv("GPU_SCRAPE_INTERVAL", "5"))
 CONCURRENCY = os.environ.get("MAX_CONCURRENCY", "20")
 VLLM_CONTAINER = os.getenv("VLLM_CONTAINER", "vllm")
 VLLM_LOG_TAIL = int(os.getenv("VLLM_LOG_TAIL", "2000"))
-AIPERF_FINALIZE_TIMEOUT = float(os.getenv("AIPERF_FINALIZE_TIMEOUT", "300"))
+# Steady replays are arrival-rate-bound: 72 requests over ~888s, so natural
+# gaps reach ~12s with long quiet stretches. A 300s bound reaped a healthy
+# steady run that completed normally 10 minutes later. The real hang showed
+# zero progress for well over 5 minutes with records still outstanding.
+AIPERF_FINALIZE_TIMEOUT = float(os.getenv("AIPERF_FINALIZE_TIMEOUT", "900"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("aiperf_trace_replay")
@@ -275,16 +279,15 @@ def _finalize_watchdog(process, artifact_dir: Path) -> int:
             process.kill()
             with suppress(Exception):
                 process.wait(timeout=30)
-            # reap orphaned children of the killed process only; a bare
-            # `pkill -f aiperf` would also match this script's own cmdline
-            # AIPerf spawns a manager tree; -P kills direct children only and
-            # leaves ~20 grandchildren scraping. Match on process name instead.
+            # AIPerf rewrites its process title to "aiperf <role>", so comm
+            # is truncated ("aiperf dataset_") and pkill -x never matches.
+            # Match the cmdline; the trailing space excludes a bare `aiperf`.
             subprocess.run(  # nosec B603 - fixed argv, no shell
-                ["pkill", "-TERM", "-x", "aiperf"], check=False, timeout=15,
+                ["pkill", "-TERM", "-f", "aiperf "], check=False, timeout=15,
             )
             time.sleep(5)
             subprocess.run(  # nosec B603 - fixed argv, no shell
-                ["pkill", "-9", "-x", "aiperf"], check=False, timeout=15,
+                ["pkill", "-9", "-f", "aiperf "], check=False, timeout=15,
             )
             (artifact_dir / "RECOVERED").write_text(
                 "AIPerf finalisation did not complete; reaped after "
