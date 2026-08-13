@@ -106,7 +106,9 @@ services:
   vllm:
     image: ${VLLM_IMAGE:-vllm/vllm-openai:latest}
     container_name: vllm
-    restart: unless-stopped
+    # VLLM_RESTART_POLICY=no runs the restart-disabled control (§VI-H);
+    # default keeps the supervised behaviour every other run depends on.
+    restart: ${VLLM_RESTART_POLICY:-unless-stopped}
     profiles:
       - local
     command:
