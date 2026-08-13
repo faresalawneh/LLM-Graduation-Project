@@ -149,6 +149,50 @@ def recover(artifact_dir: Path) -> dict[str, Any]:
     return result
 
 
+CSV_LABELS = {
+    "request_latency": "Request Latency (ms)",
+    "time_to_first_token": "Time to First Token (ms)",
+    "time_to_second_token": "Time to Second Token (ms)",
+    "inter_token_latency": "Inter Token Latency (ms)",
+    "inter_chunk_latency": "Inter Chunk Latency (ms)",
+    "output_sequence_length": "Output Sequence Length (tokens)",
+    "input_sequence_length": "Input Sequence Length (tokens)",
+    "output_token_count": "Output Token Count (tokens)",
+    "time_to_first_output_token": "Time to First Output Token (ms)",
+    "http_req_duration": "HTTP Duration (excl. conn) (ms)",
+    "http_req_waiting": "HTTP Waiting (TTFB) (ms)",
+    "http_req_receiving": "HTTP Receiving (ms)",
+    "http_req_sending": "HTTP Sending (ms)",
+}
+CSV_COLUMNS = ("avg", "min", "max", "sum", "p1", "p5", "p10",
+               "p25", "p50", "p75", "p90", "p95", "p99", "std")
+
+
+def write_csv(result: dict[str, Any], destination: Path) -> None:
+    """Emit an AIPerf-shaped summary CSV from recovered aggregates.
+
+    mlflow_log_run.py reads profile_export_aiperf.csv; recovered runs have no
+    native CSV, so without this they cannot be logged to MLflow.
+    """
+    import csv as _csv
+
+    with destination.open("w", newline="") as handle:
+        writer = _csv.writer(handle)
+        writer.writerow(("Metric",) + CSV_COLUMNS)
+        for key, label in CSV_LABELS.items():
+            block = result.get(key)
+            if not isinstance(block, dict):
+                continue
+            row = [label]
+            for column in CSV_COLUMNS:
+                value = block.get(column)
+                row.append("" if value is None else "{:.2f}".format(float(value)))
+            writer.writerow(row)
+        count = result.get("request_latency", {}).get("count")
+        if count is not None:
+            writer.writerow(["Request Count (count)"] + ["{:.2f}".format(float(count))] * len(CSV_COLUMNS))
+
+
 def validate(artifact_dir: Path) -> bool:
     """Compare recovered aggregates against AIPerf's own, when both exist."""
     native_path = artifact_dir / "profile_export_aiperf.json"
@@ -198,6 +242,7 @@ def main() -> int:
             result = recover(artifact_dir)
             destination = artifact_dir / "profile_export_recovered.json"
             destination.write_text(json.dumps(result, indent=1))
+            write_csv(result, artifact_dir / "profile_export_recovered.csv")
             latency = result.get("request_latency", {})
             print("  records={} latency.avg={:.4f} -> {}".format(
                 result["record_count"],

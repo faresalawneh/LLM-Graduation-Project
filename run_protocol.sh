@@ -18,7 +18,7 @@ MON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/monitoring" && pwd)"
 REPO_ROOT="$(cd "${MON_DIR}/.." && pwd)"
 ART_ROOT="${REPO_ROOT}/artifacts"
 PROTO_DIR="${REPO_ROOT}/protocol_logs"
-COHORT="B"
+COHORT="${COHORT:-C}"
 COOLDOWN_MIN="${COOLDOWN_MIN:-20}"
 TEMP_TOLERANCE_C="${TEMP_TOLERANCE_C:-3}"
 BASELINE_FILE="${PROTO_DIR}/baseline_temp_c"
@@ -269,7 +269,9 @@ run_step() {
   fi
   cp -r "${pre}" "${rundir}protocol/" 2>/dev/null || true
 
-  python3 "${REPO_ROOT}/tag_protocol_run.py" \
+  # tag_protocol_run.py needs mlflow, which lives in the aiperf venv;
+  # run_experiment.sh activates it in its own subshell, this one does not.
+  "${AIPERF_VENV:-$HOME/venvs/aiperf-env}/bin/python3" "${REPO_ROOT}/tag_protocol_run.py" \
     --run-dir "${rundir}" --step "${step}" --cohort "${COHORT}" \
     --fault "${tag}" --kill-time "${kill_at}" || say "WARNING: MLflow tagging failed"
 
