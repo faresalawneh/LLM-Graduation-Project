@@ -470,9 +470,9 @@ back as `null` rather than an error.
 
 ## Team
 
-- Fares Alawneh (168712)
-- Mahmoud Al-waqfi (173032)
-- Abdelrahman Tahat (169161)
+- Fares Alawneh 
+- Mahmoud Al-waqfi 
+- Abdelrahman Tahat 
 
 Supervised by Dr. Tariq Al-omari.
 
