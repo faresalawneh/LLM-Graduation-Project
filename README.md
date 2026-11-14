@@ -19,6 +19,50 @@ auth and two roles.
 This is a Graduation Project at Jordan University of Science and Technology,
 Faculty of Computer and Information Technology.
 
+## Problem statement, objectives and scope
+
+### Problem statement
+
+Serving a large language model on a single GPU is hard to operate blind: when request
+traffic bursts, time to first token (TTFT) and request latency can degrade by orders of
+magnitude within minutes, and the cause (queueing in the serving engine versus GPU
+saturation) is only visible if application-level serving metrics and GPU hardware
+telemetry are viewed together. INFERSCOPE is an observability stack for a vLLM inference
+server that replays real request arrival patterns (BurstGPT) and brings TTFT, request
+latency, output throughput, vLLM scheduler state and GPU telemetry (SM clock, framebuffer
+usage, power, temperature) into one Prometheus instance and one Grafana view, with every
+run logged to MLflow, so that an operator can see, compare and reproduce load-induced
+degradation on one machine.
+
+### Measurable objectives
+
+| # | Objective | Metric | Target | How measured |
+|---|---|---|---|---|
+| O1 | Unified, near-live visibility | Event-to-panel delay: time from a request completing to the value appearing on the Grafana vLLM dashboard | <= 20 s (5 s scrape + 10 s dashboard refresh + margin) | During a smoke run, compare AIPerf per-request completion timestamps with the first Grafana/Prometheus sample that reflects them; report the median and max over 10 events |
+| O2 | Complete telemetry coverage | Share of required series that have >= 1 sample per 15 s throughout a steady run. Required: ttft_ms, request_latency_ms, throughput_tokens_per_sec, vllm:* scheduler gauges, DCGM_FI_DEV_SM_CLOCK, DCGM_FI_DEV_FB_USED | 100% of required series. Power and temperature best effort; PCIe panel documented as unsupported on WSL2 | Prometheus range queries over the run window, checked by a script, result stored in the MLflow run |
+| O3 | Characterized steady-load latency | TTFT p95 and request latency p95 for the 72-request steady window | TTFT p95 <= 1,000 ms (to be confirmed against the first full AIPerf baseline; the legacy path measured 509 ms average TTFT) | `profile_export_aiperf.csv` p95 rows, logged as MLflow metrics |
+| O4 | Degradation is visible before it is severe | Lead time between a leading indicator (vllm:num_requests_waiting above a set threshold) and TTFT first exceeding the SLO, on the 9,483-request burst window | Lead time >= 5 s in the burst run; steady run has zero false alarms | Offline analysis of `server_metrics_export.csv` (333 ms polling) against per-request TTFT in `profile_export.jsonl` |
+| O5 | Reproducible, trustworthy runs | (a) Coefficient of variation of TTFT p95 across 3 repeat steady runs. (b) Runs with an unflagged vLLM restart/OOM | (a) CoV <= 15%. (b) 0: any restart is recorded in MLflow (`vllm_restarts_during_run`) and the run is marked invalid | Repeat `./run_experiment.sh steady` three times; compare MLflow runs; check restart metrics |
+
+### MVP scope
+
+**In scope**
+- One machine, one GPU, one model (Qwen2.5-1.5B-Instruct) served by vLLM
+- Trace replay of two committed BurstGPT windows (steady: 72 requests, burst: 9,483) through AIPerf
+- Prometheus, OpenTelemetry collector, NVML-based GPU exporter and two Grafana dashboards (vLLM serving, GPU telemetry)
+- MLflow run logging with restart/OOM detection
+- Read-only FastAPI service with JWT auth and two roles exposing the same metrics
+- Reproduction instructions in the README
+
+**Out of scope**
+- Multi-GPU, multi-node or multi-model serving
+- Serving engines other than vLLM
+- Automated remediation (load shedding, autoscaling, request routing)
+- A trained prediction model for degradation (O4 uses a threshold-based leading indicator only)
+- DCGM profiling counters (`DCGM_FI_PROF_*`) and anything requiring DCGM on WSL2
+- Production hardening (secrets management, multi-user accounts, TLS, HA Prometheus)
+- Alerting integrations (email, Slack, PagerDuty)
+
 ## Architecture
 
 ```
