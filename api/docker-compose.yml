@@ -1,7 +1,23 @@
+# Run the API next to the monitoring stack (start it first:
+#   cd monitoring && docker compose --profile local up -d).
+# The API joins the monitoring network so it can reach Prometheus by service name.
+# Compose names that network <project>_monitoring; the project defaults to the
+# directory name, so from monitoring/ it is monitoring_monitoring. Override with
+# MONITORING_NETWORK if you started the stack under another project name.
 services:
   llm-api:
     image: faresalawneh/llm-observability-api:latest
     container_name: llm-api
     ports:
       - "5000:5000"
+    environment:
+      - PROMETHEUS_URL=${PROMETHEUS_URL:-http://prometheus:9090}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+    networks:
+      - monitoring
     restart: unless-stopped
+
+networks:
+  monitoring:
+    name: ${MONITORING_NETWORK:-monitoring_monitoring}
+    external: true

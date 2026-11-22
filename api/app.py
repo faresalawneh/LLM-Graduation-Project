@@ -1,11 +1,13 @@
 """LLM Observability API - FastAPI with JWT auth."""
-from typing import Annotated, Optional
+import os
+from itertools import count
+from typing import Annotated, Dict, List, Literal, Optional
 
 import requests
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from auth import (
     Token,
@@ -18,7 +20,10 @@ from auth import (
 
 
 
-PROMETHEUS_URL = "http://localhost:9090"
+# Inside Docker, "localhost" is the API container itself. Set PROMETHEUS_URL to
+# the Prometheus service name (e.g. http://prometheus:9090) when the API shares
+# the monitoring compose network.
+PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://localhost:9090").rstrip("/")
 
 app = FastAPI(
     title="LLM Observability API",
@@ -54,6 +59,45 @@ class VLLMStats(BaseModel):
     requests_waiting: Optional[float] = None
     requests_running: Optional[float] = None
     kv_cache_usage_pct: Optional[float] = None
+
+
+# Metrics an alert threshold can be attached to.
+ThresholdMetric = Literal[
+    "ttft_ms",
+    "request_latency_ms",
+    "throughput_tokens_per_sec",
+    "gpu_temperature_c",
+    "gpu_power_w",
+    "gpu_memory_used_mib",
+    "vllm_requests_waiting",
+    "vllm_kv_cache_usage_pct",
+]
+
+
+class ThresholdBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    metric: ThresholdMetric
+    operator: Literal[">", "<"] = ">"
+    value: float
+    enabled: bool = True
+
+
+class ThresholdCreate(ThresholdBase):
+    pass
+
+
+class ThresholdUpdate(ThresholdBase):
+    pass
+
+
+class Threshold(ThresholdBase):
+    id: int
+    created_by: str
+
+
+# ---------- In-memory threshold store (lost on restart) ----------
+_thresholds: Dict[int, Threshold] = {}
+_threshold_ids = count(1)
 
 
 # ---------- Helper ----------
@@ -133,6 +177,59 @@ async def vllm(user: Annotated[User, Depends(require_role("admin"))]):
         requests_running=query_prometheus("vllm:num_requests_running"),
         kv_cache_usage_pct=query_prometheus("vllm:gpu_cache_usage_perc"),
     )
+
+
+# ---------- Alert thresholds: full CRUD ----------
+# GET/POST: any authenticated user. PUT/DELETE: admin only.
+@app.post(
+    "/thresholds",
+    response_model=Threshold,
+    status_code=status.HTTP_201_CREATED,
+    tags=["thresholds"],
+)
+async def create_threshold(
+    body: ThresholdCreate, user: Annotated[User, Depends(get_current_user)]
+):
+    threshold = Threshold(id=next(_threshold_ids), created_by=user.username, **body.model_dump())
+    _thresholds[threshold.id] = threshold
+    return threshold
+
+
+@app.get("/thresholds", response_model=List[Threshold], tags=["thresholds"])
+async def list_thresholds(user: Annotated[User, Depends(get_current_user)]):
+    return list(_thresholds.values())
+
+
+@app.get("/thresholds/{threshold_id}", response_model=Threshold, tags=["thresholds"])
+async def get_threshold(
+    threshold_id: int, user: Annotated[User, Depends(get_current_user)]
+):
+    threshold = _thresholds.get(threshold_id)
+    if threshold is None:
+        raise HTTPException(status_code=404, detail="Threshold not found")
+    return threshold
+
+
+@app.put("/thresholds/{threshold_id}", response_model=Threshold, tags=["thresholds"])
+async def update_threshold(
+    threshold_id: int,
+    body: ThresholdUpdate,
+    user: Annotated[User, Depends(require_role("admin"))],
+):
+    existing = _thresholds.get(threshold_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Threshold not found")
+    updated = Threshold(id=threshold_id, created_by=existing.created_by, **body.model_dump())
+    _thresholds[threshold_id] = updated
+    return updated
+
+
+@app.delete("/thresholds/{threshold_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["thresholds"])
+async def delete_threshold(
+    threshold_id: int, user: Annotated[User, Depends(require_role("admin"))]
+):
+    if _thresholds.pop(threshold_id, None) is None:
+        raise HTTPException(status_code=404, detail="Threshold not found")
 
 
 if __name__ == "__main__":
