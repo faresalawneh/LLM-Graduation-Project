@@ -241,15 +241,33 @@ cd monitoring
 In the UI, toggle "Model training" (not GenAI) at top left, then open the
 `inferscope-gp2` experiment.
 
-### 8. Run the API (independent of the above)
+### 8. Run the API
+
+Start the monitoring stack first (step above), then:
 
 ```bash
 docker compose -f api/docker-compose.yml up -d
 curl -s http://localhost:5000/health
 ```
 
-Swagger UI is at `http://localhost:5000/docs`. See Configuration for why this
-container cannot reach Prometheus as shipped.
+`api/docker-compose.yml` joins the monitoring compose network
+(`monitoring_monitoring`, the name compose gives it when the stack is started
+from `monitoring/`) and sets `PROMETHEUS_URL=http://prometheus:9090`. If you
+started the stack under a different project name, set `MONITORING_NETWORK`.
+Without the monitoring stack the network does not exist and `up` fails; to run
+the API alone on the host use
+`PROMETHEUS_URL=http://localhost:9090 python api/app.py` instead.
+
+Swagger UI is at `http://localhost:5000/docs`. Alert thresholds are a full CRUD
+resource at `/thresholds` (POST/GET for any logged-in user, PUT/DELETE admin
+only; stored in memory, so they reset when the container restarts):
+
+```bash
+TOKEN=$(curl -s -d 'username=admin&password=admin123' http://localhost:5000/auth/token | jq -r .access_token)
+curl -s -X POST http://localhost:5000/thresholds -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"High TTFT","metric":"ttft_ms","operator":">","value":500}'
+```
 
 ## Repo layout
 
@@ -276,9 +294,9 @@ container cannot reach Prometheus as shipped.
 | `monitoring/scripts/make_test_trace.py` | Writes a 10-row BurstGPT-format CSV for smoke tests |
 | `monitoring/scripts/steady_window.csv` | Bucket 21661, 72 requests / 900s (Git LFS) |
 | `monitoring/scripts/burst_window.csv` | Bucket 23832, 9,483 requests / 900s (Git LFS) |
-| `api/app.py` | FastAPI service: health, auth, metrics summary, GPU, vLLM |
+| `api/app.py` | FastAPI service: health, auth, metrics summary, GPU, vLLM, alert thresholds CRUD |
 | `api/auth.py` | JWT issue/verify, bcrypt password check, role dependency |
-| `api/test_app.py` | 16 API tests, run in CI |
+| `api/test_app.py` | 30 API tests, run in CI |
 | `api/Dockerfile`, `api/requirements.txt`, `api/docker-compose.yml` | API image and standalone run |
 | `docker/prometheus/Dockerfile` | Prometheus with `prometheus.yml` baked in |
 | `docker/grafana/Dockerfile` | Grafana with provisioning baked in |
@@ -305,7 +323,7 @@ Generated at runtime and gitignored: `artifacts/`, `mlruns/`, `monitoring/logs/`
 | `monitoring/scripts/make_test_trace.py` | Writes a 10-row BurstGPT-format CSV spanning ~10s | Optional `TRACE_FILE` (default `test_trace.csv`) | That CSV |
 | `monitoring/scripts/burstgpt_real_replay.py` | Legacy: reads the full BurstGPT CSV, replays buckets 21661 and 23832 with raw `requests`, pushes to Pushgateway :9091 | `DATASET_PATH`, `ARTIFACT_ROOT` (Windows-absolute defaults), `INFERENCE_URL`, `MODEL`, `MAX_CONCURRENCY`, `REQUEST_TIMEOUT`, `ENABLE_GPU_SCRAPE` | `<ARTIFACT_ROOT>/{steady,burst}_replay/` with `profile_export.jsonl` and `summary.json` |
 | `monitoring/exporters/nvml_exporter.py` | Serves NVML readings as DCGM-named Prometheus gauges | Optional `NVML_EXPORTER_PORT` (default 9400), `LOG_LEVEL` | `/metrics` on that port |
-| `api/app.py` | FastAPI service | Optional `JWT_SECRET` | Serves on 0.0.0.0:5000 |
+| `api/app.py` | FastAPI service | Optional `JWT_SECRET`, `PROMETHEUS_URL` (default `http://localhost:9090`) | Serves on 0.0.0.0:5000 |
 
 ## Configuration
 
@@ -320,7 +338,7 @@ What to change before running on a different machine:
 | GPU index in scrape queries | `aiperf_trace_replay.py` uses `gpu="0"`; `burstgpt_real_replay.py` uses `gpu="1"` | Edit to match the GPU you are serving on |
 | Venv path | `AIPERF_VENV` env var, default `~/venvs/aiperf-env` | Honoured by `run_experiment.sh` and `mlflow_ui.sh`. `run_local_replay.sh` only prints this path in its error message and requires `aiperf` already on PATH |
 | MLflow host tag | `monitoring/scripts/mlflow_log_run.py`, `"host": "msi-rtx5060-wsl2"` | Hardcoded on every run |
-| Prometheus URL used by the API | `api/app.py`, `PROMETHEUS_URL = "http://localhost:9090"` | Not env-configurable. `api/docker-compose.yml` uses default bridge networking, so `localhost` inside that container is the container itself; either run the API on the host, add `--network host`, or edit this constant |
+| Prometheus URL used by the API | `PROMETHEUS_URL` env var, default `http://localhost:9090` | `api/docker-compose.yml` sets it to `http://prometheus:9090` and attaches the API to the monitoring network (`MONITORING_NETWORK`, default `monitoring_monitoring`). When running the API on the host, the default is correct |
 | API credentials and JWT secret | `api/auth.py` `USERS_DB`, `JWT_SECRET` env var | Users are hardcoded with bcrypt hashes. Default secret is `dev-secret-change-in-production` |
 | Grafana admin password | `monitoring/docker-compose.yml` and `docker/grafana/Dockerfile`, `GF_SECURITY_ADMIN_PASSWORD=admin` | Baked into the published image as well |
 | Full BurstGPT dataset path | `slice_burstgpt_window.py --input`, or `DATASET_PATH` for the legacy script | The full CSV is not in the repo. `.gitignore` expects it at `monitoring/BurstGPT_without_fails_3.csv` |
@@ -459,7 +477,7 @@ them for scripts that no longer exist (`aiperf_with_push.py`,
    `requirements-experiments.txt` is deliberately not installed, so
    `mlflow_log_run.py` is not exercised.
 2. `pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v` with
-   `PYTHONPATH=api`. 16 API tests plus 3 exporter tests. `pytest.ini` turns
+   `PYTHONPATH=api`. 30 API tests plus 3 exporter tests. `pytest.ini` turns
    warnings into errors, with one starlette/httpx deprecation ignored.
 3. `bandit -r api/app.py`.
 4. `promtool check config` on `monitoring/prometheus/prometheus.yml`, run
