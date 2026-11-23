@@ -28,6 +28,13 @@ jobs:
         env:
           PYTHONPATH: api
         run: pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v
+      - name: Run Postman collection (Newman)
+        working-directory: api
+        run: |
+          python -m uvicorn app:app --port 5000 > /tmp/api.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:5000/health && break; sleep 1; done
+          npx --yes newman@6 run postman/llm-observability-api.postman_collection.json \
+            -e postman/local.postman_environment.json --bail
       - name: Run Security Scan
         run: bandit -r api/app.py
 

@@ -269,6 +269,31 @@ curl -s -X POST http://localhost:5000/thresholds -H "Authorization: Bearer $TOKE
   -d '{"name":"High TTFT","metric":"ttft_ms","operator":">","value":500}'
 ```
 
+### 9. Test the API (Swagger and Postman)
+
+Demo users: `admin` / `admin123` (all endpoints) and `viewer` / `viewer123`
+(no `/gpu`, `/vllm`, or threshold PUT/DELETE; those return 403).
+
+**Swagger.** Open `http://localhost:5000/docs`, click **Authorize**, enter a
+username and password (leave client id/secret empty), then use **Try it out**
+on each endpoint. Log out and repeat as the other user.
+
+**Postman.** `api/postman/` holds a collection (32 requests, 59 assertions) and
+a `local` environment (`baseUrl`, credentials). Import both, select the
+environment and run the whole collection in order: it logs in as both users,
+calls every endpoint, runs the threshold create/read/update/delete cycle, and
+checks the 401/403/404/422 cases. The same run works from the command line and
+runs in CI on every push:
+
+```bash
+npx newman run api/postman/llm-observability-api.postman_collection.json \
+  -e api/postman/local.postman_environment.json
+```
+
+Metric values are `null` when Prometheus is not reachable; the tests check
+status codes, field names and roles, not values. Change `baseUrl` in the
+environment to test a remote deployment.
+
 ## Repo layout
 
 | Path | Purpose |
@@ -298,6 +323,7 @@ curl -s -X POST http://localhost:5000/thresholds -H "Authorization: Bearer $TOKE
 | `api/auth.py` | JWT issue/verify, bcrypt password check, role dependency |
 | `api/test_app.py` | 30 API tests, run in CI |
 | `api/Dockerfile`, `api/requirements.txt`, `api/docker-compose.yml` | API image and standalone run |
+| `api/postman/` | Postman collection and local environment; run with Newman in CI |
 | `docker/prometheus/Dockerfile` | Prometheus with `prometheus.yml` baked in |
 | `docker/grafana/Dockerfile` | Grafana with provisioning baked in |
 | `docker/pushgateway/Dockerfile` | Unmodified `prom/pushgateway`. Built and published by CI, not used by the stack |
