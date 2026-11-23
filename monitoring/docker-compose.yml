@@ -26,8 +26,7 @@ services:
 
   # NVML-based GPU exporter for the laptop (WSL2), where DCGM cannot run.
   # Emits DCGM_FI_DEV_* metric names on the same port 9400, so Prometheus and
-  # Grafana are none the wiser. Mutually exclusive with dcgm-exporter via
-  # profiles (local vs server), so both binding 9400 never conflicts.
+  # Grafana are none the wiser.
   nvml-exporter:
     build:
       context: ..
@@ -67,26 +66,6 @@ services:
       - monitoring
     depends_on:
       - prometheus
-
-  #dcgm-exporter:
-  #  image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04
-  #  container_name: dcgm-exporter
-  #  restart: unless-stopped
-  #  profiles:
-  #    - server
-  #  cap_add:
-  #    - SYS_ADMIN
-  #  deploy:
-  #    resources:
-  #      reservations:
-  #        devices:
-  #          - driver: nvidia
-  #            count: all
-  #            capabilities: [gpu]
-  #  ports:
-  #    - "9400:9400"
-  #  networks:
-  #    - monitoring
 
   #ollama:
   #  image: ollama/ollama:latest
@@ -150,19 +129,3 @@ volumes:
   grafana_data:
   ollama_data:
   hf_cache:
-
- 
-#jaeger:
-#    image: jaegertracing/all-in-one:1.57
-#    container_name: jaeger
-#    restart: unless-stopped
-#    profiles:
-#      - server
-#    environment:
-#      - COLLECTOR_OTLP_ENABLED=true
-#    ports:
-#      - "16686:16686"    #UI
-#      - "4317:4317"      #OTLP gRPC (vLLM + replay send here)
-#      - "4318:4318"      #OTLP HTTP
-#    networks:
-#      - monitoring 

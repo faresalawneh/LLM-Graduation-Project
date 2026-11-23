@@ -139,10 +139,6 @@ panel in the GPU dashboard stays empty. Power and temperature are frequently
 unsupported under WSL2; each field is probed individually and skipped rather
 than failing the whole scrape.
 
-The `dcgm-exporter` service is commented out in `monitoring/docker-compose.yml`.
-Prometheus still lists `dcgm-exporter:9400` as a target in the `dcgm_exporter`
-job, so that target shows DOWN. That is expected.
-
 ## Quickstart
 
 ### 1. Clone and materialize the LFS traces
@@ -298,7 +294,7 @@ environment to test a remote deployment.
 
 | Path | Purpose |
 |---|---|
-| `monitoring/docker-compose.yml` | Prometheus, otel-collector, Grafana, nvml-exporter, vLLM. Commented-out dcgm-exporter, ollama, jaeger |
+| `monitoring/docker-compose.yml` | Prometheus, otel-collector, Grafana, nvml-exporter, vLLM. Commented-out ollama |
 | `monitoring/stack_up.sh` | Starts the local stack, waits for vLLM, records image digest and restart baseline |
 | `monitoring/run_experiment.sh` | One-command runner: stack, replay, MLflow logging, crash check, summary |
 | `monitoring/mlflow_ui.sh` | Launches MLflow UI against `mlruns/mlflow.db` |
@@ -379,9 +375,7 @@ What to change before running on a different machine:
 | Grafana | 3000 | always | admin / admin, dashboards provisioned |
 | nvml-exporter | 9400 | `local` | Built from `monitoring/exporters/Dockerfile.nvml` |
 | vLLM | 8000 | `local` | OpenAI-compatible server; `/metrics` scraped by the `vllm` job |
-| dcgm-exporter | 9400 | `server` | Commented out. The `server` profile currently starts nothing extra |
 | ollama | 11434 | `local` | Commented out |
-| jaeger | 16686 / 4317 / 4318 | `server` | Commented out |
 | FastAPI | 5000 | separate compose file | `api/docker-compose.yml`, not part of the monitoring stack |
 | MLflow UI | 5000 | not a container | `mlflow_ui.sh`; collides with the API's port, use `./mlflow_ui.sh 5001` |
 
@@ -443,15 +437,12 @@ write that file.
 also re-materialize them with CRLF line endings; `run_local_replay.sh` strips
 those in place before each run.
 
-**DCGM cannot run under WSL2.** The `dcgm-exporter` service is commented out
-and `nvml-exporter` takes its place on the same port with the same metric
-names. Prometheus still lists `dcgm-exporter:9400` in the `dcgm_exporter` job,
-so one target is permanently DOWN. `DCGM_FI_PROF_*` counters do not exist on
+**DCGM cannot run under WSL2.** `nvml-exporter` stands in for DCGM Exporter on
+port 9400 with the same metric names. `DCGM_FI_PROF_*` counters do not exist on
 this path, so the PCIe panel in the GPU dashboard is always empty, and power
 and temperature may be missing depending on driver support.
 
-**`docker compose --profile server` starts nothing extra.** Every service
-under that profile is commented out. Services with no profile (Prometheus,
+**Only the `local` profile exists.** Services with no profile (Prometheus,
 otel-collector, Grafana) start regardless of the flag.
 
 **Pushgateway does not expire metrics.** The legacy `burstgpt_real_replay.py`
@@ -544,12 +535,9 @@ back as `null` rather than an error.
 
 ## Not implemented yet
 
-- Jaeger and distributed tracing. The service block exists in
-  `monitoring/docker-compose.yml` but is fully commented out, and nothing in
-  the repo emits spans.
-- A working `server` profile. The `dcgm-exporter` service is commented out, so
-  the profile is empty and there is no path to running against a non-WSL2
-  server with real DCGM.
+- Jaeger and distributed tracing. Nothing in the repo emits spans.
+- Running on a non-WSL2 GPU server with real DCGM Exporter. The stack targets
+  the WSL2 laptop only.
 - Ollama as an alternative local backend. Commented out in compose; nothing
   references port 11434.
 - A committed `.env` template for `VLLM_IMAGE`.
