@@ -251,6 +251,9 @@ curl -s http://localhost:5000/health
 (`monitoring_monitoring`, the name compose gives it when the stack is started
 from `monitoring/`) and sets `PROMETHEUS_URL=http://prometheus:9090`. If you
 started the stack under a different project name, set `MONITORING_NETWORK`.
+It pulls the image CI publishes from `main`,
+`mahmoudalwaqfi/llm-observability-api:latest` (override the account with
+`DOCKERHUB_NAMESPACE` and the tag with `API_IMAGE_TAG`).
 Without the monitoring stack the network does not exist and `up` fails; to run
 the API alone on the host use
 `PROMETHEUS_URL=http://localhost:9090 python api/app.py` instead.
@@ -378,6 +381,7 @@ version that is assessed. Both run on the WSL2 laptop with the `local` profile.
 | Code | `main` or a feature branch | The `gp2-demo` git tag |
 | `nvml-exporter` | Built locally from `monitoring/exporters/Dockerfile.nvml` | Pulled from Docker Hub: `<DOCKERHUB_NAMESPACE>/llm-observability-nvml-exporter:<DEMO_IMAGE_TAG>` |
 | Third-party images | Pinned in `monitoring/.env` | Same pins, from the tagged `.env.example` |
+| API (`api/docker-compose.yml`) | `<DOCKERHUB_NAMESPACE>/llm-observability-api:latest` | Same image at `API_IMAGE_TAG=<gp2-demo SHA>` |
 | Compose files | `docker-compose.yml` | `docker-compose.yml` + `docker-compose.demo.yml` |
 | Start | `./stack_up.sh` | `STACK_ENV=demo ./stack_up.sh` |
 
@@ -402,7 +406,14 @@ cd monitoring
 STACK_ENV=demo ./stack_up.sh
 ```
 
-Without `stack_up.sh`, the equivalent compose command is:
+Then start the API at the same commit:
+
+```bash
+cd ..
+API_IMAGE_TAG=$(git rev-parse gp2-demo) docker compose -f api/docker-compose.yml up -d
+```
+
+Without `stack_up.sh`, the equivalent monitoring compose command is:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile local up -d
@@ -414,6 +425,7 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile local 
 | `DOCKERHUB_NAMESPACE` | `mahmoudalwaqfi` (the account in the `DOCKERHUB_USERNAME` repo secret; preset in `.env.example`) |
 | `DEMO_IMAGE_TAG` | TBD |
 | `nvml-exporter` image digest | TBD |
+| `llm-observability-api` image digest | TBD |
 | vLLM image | `vllm/vllm-openai:v0.6.3` |
 | Prometheus image | `prom/prometheus:v3.16.0` |
 | Grafana image | `grafana/grafana:13.3.1` |
