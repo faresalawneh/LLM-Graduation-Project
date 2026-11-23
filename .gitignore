@@ -12,3 +12,4 @@ monitoring/scripts/burst_smoke.csv
 .vscode/
 mlruns/
 monitoring/logs/
+.idea/
