@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Bring up the local INFERSCOPE stack (vLLM + monitoring) and instrument it.
-# Usage: ./stack_up.sh
+# Usage: ./stack_up.sh                  (dev: builds nvml-exporter locally)
+#        STACK_ENV=demo ./stack_up.sh   (demo: published images, see docker-compose.demo.yml)
 # Then:  monitoring/scripts/run_local_replay.sh [steady|burst]
 
 MON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,6 +11,14 @@ LOG_DIR="${MON_DIR}/logs"
 mkdir -p "${LOG_DIR}"
 
 cd "${MON_DIR}"
+
+STACK_ENV="${STACK_ENV:-dev}"
+COMPOSE=(docker compose)
+case "${STACK_ENV}" in
+  dev) ;;
+  demo) COMPOSE+=(-f docker-compose.yml -f docker-compose.demo.yml) ;;
+  *) echo "STACK_ENV must be dev or demo (got: ${STACK_ENV})" >&2; exit 1 ;;
+esac
 
 command -v docker >/dev/null \
   || { echo "docker unreachable - enable WSL integration in Docker Desktop" >&2; exit 1; }
@@ -21,8 +30,8 @@ case "${IMG}" in
 esac
 echo "vllm image: ${IMG}"
 
-echo "starting stack (profile: local)..."
-docker compose --profile local up -d
+echo "starting stack (env: ${STACK_ENV}, profile: local)..."
+"${COMPOSE[@]}" --profile local up -d
 
 # Crash instrumentation: vLLM has restart:unless-stopped, so a die/restart is
 # otherwise invisible. Capture exit codes live.
@@ -38,7 +47,7 @@ WAIT="${VLLM_WAIT:-420}"; elapsed=0
 until curl -sf "http://localhost:8000/v1/models" >/dev/null 2>&1; do
   if [ "${elapsed}" -ge "${WAIT}" ]; then
     echo "vLLM not ready after ${WAIT}s" >&2
-    docker compose --profile local logs --tail 40 vllm >&2
+    "${COMPOSE[@]}" --profile local logs --tail 40 vllm >&2
     exit 1
   fi
   printf '\rloading model... %ss' "${elapsed}"
@@ -51,6 +60,7 @@ DIGEST="$(docker inspect "${IMG}" --format '{{index .RepoDigests 0}}' 2>/dev/nul
 BASELINE="$(docker inspect vllm --format '{{.RestartCount}}' 2>/dev/null || echo 0)"
 cat > "${LOG_DIR}/stack_state.json" <<EOF
 {
+  "stack_env": "${STACK_ENV}",
   "vllm_image": "${IMG}",
   "vllm_digest": "${DIGEST}",
   "restart_count_at_start": ${BASELINE},
@@ -59,7 +69,7 @@ cat > "${LOG_DIR}/stack_state.json" <<EOF
 EOF
 
 echo
-docker compose --profile local ps --format 'table {{.Name}}\t{{.Status}}'
+"${COMPOSE[@]}" --profile local ps --format 'table {{.Name}}\t{{.Status}}'
 echo
 echo "digest: ${DIGEST}"
 echo "restart baseline: ${BASELINE}   (compare after run to detect crashes)"

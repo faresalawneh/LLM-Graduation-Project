@@ -167,16 +167,14 @@ pip install "aiperf[otel]"                    # see Known issues
 pip install -r requirements-experiments.txt   # mlflow, only if you want run tracking
 ```
 
-### 3. Pin the vLLM image
+### 3. Create `monitoring/.env`
 
-`monitoring/.env` is gitignored and there is no template committed. Create it
-before the first run. `stack_up.sh` refuses to start if `VLLM_IMAGE` is unset
-or ends in `:latest`.
+`monitoring/.env` is gitignored. Copy the committed template, which pins every
+image to an exact version. `stack_up.sh` refuses to start if `VLLM_IMAGE` is
+unset or ends in `:latest`.
 
 ```bash
-cat > monitoring/.env <<'EOF'
-VLLM_IMAGE=vllm/vllm-openai:<tag>
-EOF
+cp monitoring/.env.example monitoring/.env
 ```
 
 ### 4. Start the stack
@@ -185,6 +183,9 @@ EOF
 cd monitoring
 ./stack_up.sh
 ```
+
+This is the dev environment: it builds `nvml-exporter` locally. For the
+assessed version, see [Dev and demo environments](#dev-and-demo-environments).
 
 This runs `docker compose --profile local up -d` (Prometheus, otel-collector,
 Grafana, nvml-exporter, vLLM), starts a `docker events` watcher writing to
@@ -250,6 +251,9 @@ curl -s http://localhost:5000/health
 (`monitoring_monitoring`, the name compose gives it when the stack is started
 from `monitoring/`) and sets `PROMETHEUS_URL=http://prometheus:9090`. If you
 started the stack under a different project name, set `MONITORING_NETWORK`.
+It pulls the image CI publishes from `main`,
+`mahmoudalwaqfi/llm-observability-api:latest` (override the account with
+`DOCKERHUB_NAMESPACE` and the tag with `API_IMAGE_TAG`).
 Without the monitoring stack the network does not exist and `up` fails; to run
 the API alone on the host use
 `PROMETHEUS_URL=http://localhost:9090 python api/app.py` instead.
@@ -335,7 +339,7 @@ Generated at runtime and gitignored: `artifacts/`, `mlruns/`, `monitoring/logs/`
 
 | Script | What it does | Required args / env | Output |
 |---|---|---|---|
-| `monitoring/stack_up.sh` | Compose up (`local` profile), starts `docker events` watcher, waits for `/v1/models` | Needs `monitoring/.env` with a pinned `VLLM_IMAGE`. Optional `VLLM_WAIT` (default 420) | `monitoring/logs/vllm_events.jsonl`, `monitoring/logs/stack_state.json` |
+| `monitoring/stack_up.sh` | Compose up (`local` profile), starts `docker events` watcher, waits for `/v1/models` | Needs `monitoring/.env` with a pinned `VLLM_IMAGE`. Optional `VLLM_WAIT` (default 420), `STACK_ENV` (`dev` default, or `demo`) | `monitoring/logs/vllm_events.jsonl`, `monitoring/logs/stack_state.json` |
 | `monitoring/run_experiment.sh` | Stack check, replay, MLflow logging, restart/OOM check, prints AIPerf CSV summary and `nvidia-smi` VRAM | Arg `smoke\|steady\|burst` (or menu). Flags `--teardown`, `--no-mlflow`, `--keep-stack`. Optional `AIPERF_VENV` | `artifacts/<scenario>_<ts>/`; smoke goes to `/tmp/smoke_artifacts/` from `/tmp/burst_smoke.csv` |
 | `monitoring/scripts/run_local_replay.sh` | Exports the run environment, normalizes CRLF in the trace, waits for vLLM, warns if 9400/9090 are down, calls the replay driver | Arg `steady\|burst` (default `steady`). Optional `TRACE_FILE`, `ARTIFACT_ROOT`, `VLLM_WAIT` (default 300). `aiperf` must be on PATH | Delegates to `aiperf_trace_replay.py` |
 | `monitoring/scripts/aiperf_trace_replay.py` | Builds and runs `aiperf profile`; optional Prometheus GPU scrape thread every 5s | `SCENARIO` must be `steady` or `burst`; `TRACE_FILE` must exist. Also `MODEL`, `INFERENCE_URL`, `ENDPOINT_TYPE`, `ARTIFACT_ROOT`, `TOKENIZER`, `SLICE_DURATION`, `OTEL_URL`, `PROMETHEUS_URL`, `MAX_CONCURRENCY`, `ENABLE_GPU_SCRAPE` | `<ARTIFACT_ROOT>/<scenario>_<YYYY-MM-DD_HHMM>/` containing `run_manifest.json`, AIPerf exports, and `gpu_telemetry.jsonl` if scraping is on |
@@ -353,7 +357,8 @@ What to change before running on a different machine:
 
 | Item | Where | Note |
 |---|---|---|
-| vLLM image tag | `monitoring/.env`, key `VLLM_IMAGE` | Required. Must not be `:latest`. Not committed and no template exists, so create it by hand |
+| Image versions | `monitoring/.env` (copy of `monitoring/.env.example`): `VLLM_IMAGE`, `PROMETHEUS_IMAGE`, `GRAFANA_IMAGE`, `OTEL_COLLECTOR_IMAGE` | Pinned in the template. `VLLM_IMAGE` is required and must not be `:latest` |
+| Demo images | `monitoring/.env`, keys `DOCKERHUB_NAMESPACE` and `DEMO_IMAGE_TAG` | Demo only. The Docker Hub account CI pushes to, and the full commit SHA of the `gp2-demo` tag; the demo compose refuses to start without either |
 | Model, `--max-model-len`, `--gpu-memory-utilization` | `monitoring/docker-compose.yml`, `vllm` service `command` | Currently `Qwen/Qwen2.5-1.5B-Instruct`, `4096`, `0.85`, `--dtype float16` |
 | Model name used by the replay | `monitoring/scripts/run_local_replay.sh`, `export MODEL=` | Must match the served model. This is `export`, not a default, so setting `MODEL` in the environment will not override it |
 | Concurrency | `monitoring/scripts/run_local_replay.sh`, `MAX_CONCURRENCY=20` | Fixed for comparability across runs. Same override caveat |
@@ -364,6 +369,67 @@ What to change before running on a different machine:
 | API credentials and JWT secret | `api/auth.py` `USERS_DB`, `JWT_SECRET` env var | Users are hardcoded with bcrypt hashes. Default secret is `dev-secret-change-in-production` |
 | Grafana admin password | `monitoring/docker-compose.yml` and `docker/grafana/Dockerfile`, `GF_SECURITY_ADMIN_PASSWORD=admin` | Baked into the published image as well |
 | Full BurstGPT dataset path | `slice_burstgpt_window.py --input`, or `DATASET_PATH` for the legacy script | The full CSV is not in the repo. `.gitignore` expects it at `monitoring/BurstGPT_without_fails_3.csv` |
+
+## Dev and demo environments
+
+The project keeps two configurations so that development work cannot break the
+version that is assessed. Both run on the WSL2 laptop with the `local` profile.
+
+| | Dev | Demo |
+|---|---|---|
+| Purpose | Daily work and experiments | The frozen, assessed version |
+| Code | `main` or a feature branch | The `gp2-demo` git tag |
+| `nvml-exporter` | Built locally from `monitoring/exporters/Dockerfile.nvml` | Pulled from Docker Hub: `<DOCKERHUB_NAMESPACE>/llm-observability-nvml-exporter:<DEMO_IMAGE_TAG>` |
+| Third-party images | Pinned in `monitoring/.env` | Same pins, from the tagged `.env.example` |
+| API (`api/docker-compose.yml`) | `<DOCKERHUB_NAMESPACE>/llm-observability-api:latest` | Same image at `API_IMAGE_TAG=<gp2-demo SHA>` |
+| Compose files | `docker-compose.yml` | `docker-compose.yml` + `docker-compose.demo.yml` |
+| Start | `./stack_up.sh` | `STACK_ENV=demo ./stack_up.sh` |
+
+`stack_up.sh` records which environment it started (`stack_env`) in
+`monitoring/logs/stack_state.json`.
+
+### Reproducing the demo
+
+Draft: the tag and image SHA are filled in once the assessed commit is final.
+
+```bash
+git clone https://github.com/faresalawneh/LLM-Graduation-Project.git
+cd LLM-Graduation-Project
+git checkout gp2-demo
+git lfs install && git lfs pull
+
+cp monitoring/.env.example monitoring/.env
+# in monitoring/.env set DEMO_IMAGE_TAG to the full SHA printed by:
+git rev-parse gp2-demo
+
+cd monitoring
+STACK_ENV=demo ./stack_up.sh
+```
+
+Then start the API at the same commit:
+
+```bash
+cd ..
+API_IMAGE_TAG=$(git rev-parse gp2-demo) docker compose -f api/docker-compose.yml up -d
+```
+
+Without `stack_up.sh`, the equivalent monitoring compose command is:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile local up -d
+```
+
+| Item | Value |
+|---|---|
+| Git tag | `gp2-demo` (not created yet) |
+| `DOCKERHUB_NAMESPACE` | `mahmoudalwaqfi` (the account in the `DOCKERHUB_USERNAME` repo secret; preset in `.env.example`) |
+| `DEMO_IMAGE_TAG` | TBD |
+| `nvml-exporter` image digest | TBD |
+| `llm-observability-api` image digest | TBD |
+| vLLM image | `vllm/vllm-openai:v0.6.3` |
+| Prometheus image | `prom/prometheus:v3.16.0` |
+| Grafana image | `grafana/grafana:13.3.1` |
+| otel-collector image | `otel/opentelemetry-collector-contrib:0.116.1` |
 
 ## Services and ports
 
@@ -428,9 +494,8 @@ and what `aiperf_trace_replay.py` defaults to.
 
 **`VLLM_IMAGE` must be pinned.** `stack_up.sh` exits if the tag is missing or
 ends in `:latest`, because the current `:latest` image dies on this Blackwell
-GPU with UVA unavailable. `monitoring/.env` is gitignored and no
-`.env.example` is committed, so a fresh clone cannot start the stack until you
-write that file.
+GPU with UVA unavailable. Copy `monitoring/.env.example` to `monitoring/.env`
+on a fresh clone; the template already pins it.
 
 **Trace CSVs are Git LFS pointers.** Without `git lfs checkout` they are
 130-byte text files and `aiperf` will read a nonsense trace. A checkout can
@@ -540,7 +605,6 @@ back as `null` rather than an error.
   the WSL2 laptop only.
 - Ollama as an alternative local backend. Commented out in compose; nothing
   references port 11434.
-- A committed `.env` template for `VLLM_IMAGE`.
 - Any automated concurrency sweep or latency-degradation early-warning
   analysis. Runs are logged to MLflow, but nothing in the repo compares them.
 

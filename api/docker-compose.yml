@@ -4,9 +4,13 @@
 # Compose names that network <project>_monitoring; the project defaults to the
 # directory name, so from monitoring/ it is monitoring_monitoring. Override with
 # MONITORING_NETWORK if you started the stack under another project name.
+#
+# The image is the one CI publishes from main. Dev uses :latest; for the demo,
+# set API_IMAGE_TAG to the full SHA of the gp2-demo tag.
 services:
   llm-api:
-    image: faresalawneh/llm-observability-api:latest
+    image: ${DOCKERHUB_NAMESPACE:-mahmoudalwaqfi}/llm-observability-api:${API_IMAGE_TAG:-latest}
+    pull_policy: always
     container_name: llm-api
     ports:
       - "5000:5000"

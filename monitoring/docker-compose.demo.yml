@@ -1,0 +1,17 @@
+# Final-demonstration override (REQ-11, #33).
+#
+# Layered on top of docker-compose.yml. Dev keeps building locally; the demo
+# pulls the images CI published to Docker Hub for one fixed commit, so later
+# work on main cannot change what is assessed.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile local up -d
+#
+# Needs monitoring/.env (copied from .env.example) with DOCKERHUB_NAMESPACE set
+# to the Docker Hub account CI pushes to, and DEMO_IMAGE_TAG set to the full SHA
+# of the gp2-demo tag. Third-party images are pinned in that file.
+
+services:
+  nvml-exporter:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?set DOCKERHUB_NAMESPACE in monitoring/.env to the Docker Hub account CI pushes to}/llm-observability-nvml-exporter:${DEMO_IMAGE_TAG:?set DEMO_IMAGE_TAG in monitoring/.env to the gp2-demo commit SHA}
+    pull_policy: always
