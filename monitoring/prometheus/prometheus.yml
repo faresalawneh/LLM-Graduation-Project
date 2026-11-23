@@ -10,13 +10,11 @@ scrape_configs:
     metrics_path: /metrics
     scrape_interval: 5s
 
-  # One job for GPU metrics in both environments: dcgm-exporter resolves on
-  # the server (profile: server), nvml-exporter on the laptop (profile: local).
-  # Only one exists at a time; the other target just shows DOWN.
+  # GPU metrics from nvml-exporter, which emits DCGM-named gauges. The job
+  # keeps the dcgm_exporter name so existing queries and dashboards still match.
   - job_name: dcgm_exporter
     static_configs:
       - targets:
-          - dcgm-exporter:9400
           - nvml-exporter:9400
     metrics_path: /metrics
     scrape_interval: 5s
