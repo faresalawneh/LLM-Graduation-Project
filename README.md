@@ -616,9 +616,10 @@ them for scripts that no longer exist (`aiperf_with_push.py`,
 2. `pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v` with
    `PYTHONPATH=api`. 30 API tests plus 3 exporter tests. `pytest.ini` turns
    warnings into errors, with one starlette/httpx deprecation ignored.
-3. `bandit -r api monitoring`, excluding `api/test_app.py` and
-   `monitoring/exporters/test_nvml_exporter.py`, where `assert` and demo passwords are
-   expected.
+3. `bandit -r api monitoring -x api/test_app.py,monitoring/exporters/test_nvml_exporter.py`.
+   The two test files are excluded because `assert` and demo passwords are expected there.
+   Bandit lists discovered paths without a `./` prefix, so the exclude entries must not
+   carry one.
 4. `promtool check config` on `monitoring/prometheus/prometheus.yml`, run
    inside a `prom/prometheus:latest` container.
 
