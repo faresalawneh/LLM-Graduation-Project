@@ -387,6 +387,62 @@ version that is assessed. Both run on the WSL2 laptop with the `local` profile.
 `stack_up.sh` records which environment it started (`stack_env`) in
 `monitoring/logs/stack_state.json`.
 
+### Published images (Docker Hub)
+
+CI publishes four images to Docker Hub on every push to `main`, each tagged
+`:latest` and `:<commit sha>`. Use the SHA tag for anything that has to be
+reproducible; `:latest` moves with `main`.
+
+| Image | Dockerfile |
+|---|---|
+| `mahmoudalwaqfi/llm-observability-api` | `api/Dockerfile` |
+| `mahmoudalwaqfi/llm-observability-grafana` | `docker/grafana/Dockerfile` |
+| `mahmoudalwaqfi/llm-observability-prometheus` | `docker/prometheus/Dockerfile` |
+| `mahmoudalwaqfi/llm-observability-nvml-exporter` | `monitoring/exporters/Dockerfile.nvml` |
+
+The commands below are single-container smoke checks: the containers share no
+network and have no scrape targets. The full stack is started with
+`./stack_up.sh`, see [Reproducing the demo](#reproducing-the-demo). Replace
+`latest` with a commit SHA to pin a version.
+
+API:
+
+```bash
+docker pull mahmoudalwaqfi/llm-observability-api:latest
+docker run -d --name llm-api -p 5000:5000 mahmoudalwaqfi/llm-observability-api:latest
+curl http://localhost:5000/health
+```
+
+Prometheus:
+
+```bash
+docker pull mahmoudalwaqfi/llm-observability-prometheus:latest
+docker run -d --name llm-prometheus -p 9090:9090 mahmoudalwaqfi/llm-observability-prometheus:latest
+curl http://localhost:9090/-/healthy
+```
+
+Grafana (needs about 10 seconds before `/api/health` answers):
+
+```bash
+docker pull mahmoudalwaqfi/llm-observability-grafana:latest
+docker run -d --name llm-grafana -p 3000:3000 mahmoudalwaqfi/llm-observability-grafana:latest
+curl http://localhost:3000/api/health
+```
+
+nvml-exporter (needs the NVIDIA container runtime):
+
+```bash
+docker pull mahmoudalwaqfi/llm-observability-nvml-exporter:latest
+docker run -d --name llm-nvml --gpus all -p 9400:9400 mahmoudalwaqfi/llm-observability-nvml-exporter:latest
+curl -s http://localhost:9400/metrics | grep -c '^DCGM_FI_'
+```
+
+Clean up afterwards:
+
+```bash
+docker rm -f llm-api llm-prometheus llm-grafana llm-nvml
+```
+
 ### Reproducing the demo
 
 Draft: the tag and image SHA are filled in once the assessed commit is final.
