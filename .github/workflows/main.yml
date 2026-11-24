@@ -36,7 +36,7 @@ jobs:
           npx --yes newman@6 run postman/llm-observability-api.postman_collection.json \
             -e postman/local.postman_environment.json --bail
       - name: Run Security Scan
-        run: bandit -r api/app.py
+        run: bandit -r api monitoring -x ./api/test_app.py,./monitoring/exporters/test_nvml_exporter.py
 
       - name: Validate Prometheus config
         run: |

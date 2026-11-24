@@ -329,7 +329,7 @@ environment to test a remote deployment.
 | `replay_results/` | Committed GP1 results from the legacy replay path |
 | `requirements.txt` | Full pinned environment, includes `aiperf==0.11.0` |
 | `requirements-experiments.txt` | MLflow pins, deliberately not installed in CI |
-| `.github/workflows/ci.yml` | Test, scan, config validation, image build and publish |
+| `.github/workflows/main.yml` | Test, scan, config validation, image build and publish |
 
 Generated at runtime and gitignored: `artifacts/`, `mlruns/`, `monitoring/logs/`,
 `monitoring/BurstGPT_without_fails_3.csv`, `monitoring/scripts/burst_smoke.csv`.
@@ -605,7 +605,7 @@ them for scripts that no longer exist (`aiperf_with_push.py`,
 
 ## CI/CD
 
-`.github/workflows/ci.yml`, triggered on pushes to `main` and
+`.github/workflows/main.yml`, triggered on pushes to `main` and
 `waqfi_experiments`, and on pull requests targeting `main`.
 
 **Stage 1, `build-and-test`** (every trigger, Ubuntu, Python 3.12):
@@ -616,7 +616,9 @@ them for scripts that no longer exist (`aiperf_with_push.py`,
 2. `pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v` with
    `PYTHONPATH=api`. 30 API tests plus 3 exporter tests. `pytest.ini` turns
    warnings into errors, with one starlette/httpx deprecation ignored.
-3. `bandit -r api/app.py`.
+3. `bandit -r api monitoring`, excluding `api/test_app.py` and
+   `monitoring/exporters/test_nvml_exporter.py`, where `assert` and demo passwords are
+   expected.
 4. `promtool check config` on `monitoring/prometheus/prometheus.yml`, run
    inside a `prom/prometheus:latest` container.
 
