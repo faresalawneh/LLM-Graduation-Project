@@ -91,8 +91,8 @@ def query_prometheus(query: str):
         result = r.json().get("data", {}).get("result", [])
         if result:
             return float(result[0]["value"][1])
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("Prometheus query failed (%s): %s", query, exc)
     return None
 
 
