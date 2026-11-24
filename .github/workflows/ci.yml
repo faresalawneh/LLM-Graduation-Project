@@ -63,9 +63,6 @@ jobs:
           - image_name: llm-observability-prometheus
             context: .
             dockerfile: ./docker/prometheus/Dockerfile
-          - image_name: llm-observability-pushgateway
-            context: .
-            dockerfile: ./docker/pushgateway/Dockerfile
           - image_name: llm-observability-nvml-exporter
             context: .
             dockerfile: ./monitoring/exporters/Dockerfile.nvml
@@ -98,9 +95,6 @@ jobs:
           - image_name: llm-observability-prometheus
             context: .
             dockerfile: ./docker/prometheus/Dockerfile
-          - image_name: llm-observability-pushgateway
-            context: .
-            dockerfile: ./docker/pushgateway/Dockerfile
           - image_name: llm-observability-nvml-exporter
             context: .
             dockerfile: ./monitoring/exporters/Dockerfile.nvml

@@ -326,7 +326,6 @@ environment to test a remote deployment.
 | `api/postman/` | Postman collection and local environment; run with Newman in CI |
 | `docker/prometheus/Dockerfile` | Prometheus with `prometheus.yml` baked in |
 | `docker/grafana/Dockerfile` | Grafana with provisioning baked in |
-| `docker/pushgateway/Dockerfile` | Unmodified `prom/pushgateway`. Built and published by CI, not used by the stack |
 | `replay_results/` | Committed GP1 results from the legacy replay path |
 | `requirements.txt` | Full pinned environment, includes `aiperf==0.11.0` |
 | `requirements-experiments.txt` | MLflow pins, deliberately not installed in CI |
@@ -514,9 +513,9 @@ otel-collector, Grafana) start regardless of the flag.
 pushes gauges that persist until explicitly deleted, so a stale run's values
 keep being scraped and mix into the next run's panels. This is one reason the
 Pushgateway was dropped from the stack. The service is no longer in
-`docker-compose.yml`, but `docker/pushgateway/Dockerfile` is still built and
-published by CI, and the legacy script still points at :9091. To use that
-script you must re-add the service and a matching Prometheus scrape job.
+`docker-compose.yml`, and the `docker/pushgateway/Dockerfile` image was removed
+in #29. The legacy script still points at :9091; to run it, start the official
+`prom/pushgateway` image and add a matching Prometheus scrape job.
 
 **`burstgpt_real_replay.py` has Windows-absolute defaults.** `DATASET_PATH` and
 `ARTIFACT_ROOT` default to `C:\Users\alawn\...`. Both must be overridden on any
@@ -566,10 +565,10 @@ them for scripts that no longer exist (`aiperf_with_push.py`,
    inside a `prom/prometheus:latest` container.
 
 **Stage 2, `build-images-dryrun`** (only when the ref is not `main`): builds all
-five images with `push: false` as a matrix, `fail-fast: false`.
+four images with `push: false` as a matrix, `fail-fast: false`.
 
 **Stage 3, `publish-images`** (only on a push to `main`): logs in to Docker Hub
-with `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` and pushes the same five images,
+with `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` and pushes the same four images,
 each tagged `:latest` and `:<commit sha>`:
 
 | Image | Dockerfile |
@@ -577,10 +576,9 @@ each tagged `:latest` and `:<commit sha>`:
 | `llm-observability-api` | `api/Dockerfile` |
 | `llm-observability-grafana` | `docker/grafana/Dockerfile` |
 | `llm-observability-prometheus` | `docker/prometheus/Dockerfile` |
-| `llm-observability-pushgateway` | `docker/pushgateway/Dockerfile` |
 | `llm-observability-nvml-exporter` | `monitoring/exporters/Dockerfile.nvml` |
 
-All five use the repository root as build context.
+All four use the repository root as build context.
 
 ## API reference
 
