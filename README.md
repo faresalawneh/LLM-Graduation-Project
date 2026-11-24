@@ -124,7 +124,7 @@ Laptop GPU (8 GB, Blackwell, sm_120) under WSL2 with Docker Desktop.
 | GPU | NVIDIA, CUDA-capable, at least 8 GB VRAM for Qwen2.5-1.5B-Instruct at `--gpu-memory-utilization 0.85` |
 | Driver | NVIDIA driver with WSL2 GPU support; the container runtime bind-mounts `libnvidia-ml.so` into the exporter |
 | Container runtime | Docker with the NVIDIA container runtime (`driver: nvidia` device reservations are used by the vllm and nvml-exporter services) |
-| Python | 3.12 (CI runs 3.12; `requirements-experiments.txt` pins are verified on 3.12). `api/Dockerfile` builds on 3.10, `Dockerfile.nvml` on 3.12 |
+| Python | 3.12 (CI runs 3.12; `requirements-experiments.txt` pins are verified on 3.12). `api/Dockerfile` and `Dockerfile.nvml` both build on 3.12 |
 | Disk | Hugging Face model cache lives in the `hf_cache` Docker volume; a burst run's artifact directory plus its MLflow copy is on the order of a few hundred MB. `burst_window.csv` is 392 KB over Git LFS |
 | RAM | Not pinned anywhere in the repo |
 
