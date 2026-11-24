@@ -124,7 +124,7 @@ Laptop GPU (8 GB, Blackwell, sm_120) under WSL2 with Docker Desktop.
 | GPU | NVIDIA, CUDA-capable, at least 8 GB VRAM for Qwen2.5-1.5B-Instruct at `--gpu-memory-utilization 0.85` |
 | Driver | NVIDIA driver with WSL2 GPU support; the container runtime bind-mounts `libnvidia-ml.so` into the exporter |
 | Container runtime | Docker with the NVIDIA container runtime (`driver: nvidia` device reservations are used by the vllm and nvml-exporter services) |
-| Python | 3.12 (CI runs 3.12; `requirements-experiments.txt` pins are verified on 3.12). `api/Dockerfile` builds on 3.10, `Dockerfile.nvml` on 3.12 |
+| Python | 3.12 (CI runs 3.12; `requirements-experiments.txt` pins are verified on 3.12). `api/Dockerfile` and `Dockerfile.nvml` both build on 3.12 |
 | Disk | Hugging Face model cache lives in the `hf_cache` Docker volume; a burst run's artifact directory plus its MLflow copy is on the order of a few hundred MB. `burst_window.csv` is 392 KB over Git LFS |
 | RAM | Not pinned anywhere in the repo |
 
@@ -326,7 +326,6 @@ environment to test a remote deployment.
 | `api/postman/` | Postman collection and local environment; run with Newman in CI |
 | `docker/prometheus/Dockerfile` | Prometheus with `prometheus.yml` baked in |
 | `docker/grafana/Dockerfile` | Grafana with provisioning baked in |
-| `docker/pushgateway/Dockerfile` | Unmodified `prom/pushgateway`. Built and published by CI, not used by the stack |
 | `replay_results/` | Committed GP1 results from the legacy replay path |
 | `requirements.txt` | Full pinned environment, includes `aiperf==0.11.0` |
 | `requirements-experiments.txt` | MLflow pins, deliberately not installed in CI |
@@ -387,6 +386,62 @@ version that is assessed. Both run on the WSL2 laptop with the `local` profile.
 
 `stack_up.sh` records which environment it started (`stack_env`) in
 `monitoring/logs/stack_state.json`.
+
+### Published images (Docker Hub)
+
+CI publishes four images to Docker Hub on every push to `main`, each tagged
+`:latest` and `:<commit sha>`. Use the SHA tag for anything that has to be
+reproducible; `:latest` moves with `main`.
+
+| Image | Dockerfile |
+|---|---|
+| `mahmoudalwaqfi/llm-observability-api` | `api/Dockerfile` |
+| `mahmoudalwaqfi/llm-observability-grafana` | `docker/grafana/Dockerfile` |
+| `mahmoudalwaqfi/llm-observability-prometheus` | `docker/prometheus/Dockerfile` |
+| `mahmoudalwaqfi/llm-observability-nvml-exporter` | `monitoring/exporters/Dockerfile.nvml` |
+
+The commands below are single-container smoke checks: the containers share no
+network and have no scrape targets. The full stack is started with
+`./stack_up.sh`, see [Reproducing the demo](#reproducing-the-demo). Replace
+`latest` with a commit SHA to pin a version.
+
+API:
+
+```bash
+docker pull mahmoudalwaqfi/llm-observability-api:latest
+docker run -d --name llm-api -p 5000:5000 mahmoudalwaqfi/llm-observability-api:latest
+curl http://localhost:5000/health
+```
+
+Prometheus:
+
+```bash
+docker pull mahmoudalwaqfi/llm-observability-prometheus:latest
+docker run -d --name llm-prometheus -p 9090:9090 mahmoudalwaqfi/llm-observability-prometheus:latest
+curl http://localhost:9090/-/healthy
+```
+
+Grafana (needs about 10 seconds before `/api/health` answers):
+
+```bash
+docker pull mahmoudalwaqfi/llm-observability-grafana:latest
+docker run -d --name llm-grafana -p 3000:3000 mahmoudalwaqfi/llm-observability-grafana:latest
+curl http://localhost:3000/api/health
+```
+
+nvml-exporter (needs the NVIDIA container runtime):
+
+```bash
+docker pull mahmoudalwaqfi/llm-observability-nvml-exporter:latest
+docker run -d --name llm-nvml --gpus all -p 9400:9400 mahmoudalwaqfi/llm-observability-nvml-exporter:latest
+curl -s http://localhost:9400/metrics | grep -c '^DCGM_FI_'
+```
+
+Clean up afterwards:
+
+```bash
+docker rm -f llm-api llm-prometheus llm-grafana llm-nvml
+```
 
 ### Reproducing the demo
 
@@ -514,9 +569,9 @@ otel-collector, Grafana) start regardless of the flag.
 pushes gauges that persist until explicitly deleted, so a stale run's values
 keep being scraped and mix into the next run's panels. This is one reason the
 Pushgateway was dropped from the stack. The service is no longer in
-`docker-compose.yml`, but `docker/pushgateway/Dockerfile` is still built and
-published by CI, and the legacy script still points at :9091. To use that
-script you must re-add the service and a matching Prometheus scrape job.
+`docker-compose.yml`, and the `docker/pushgateway/Dockerfile` image was removed
+in #29. The legacy script still points at :9091; to run it, start the official
+`prom/pushgateway` image and add a matching Prometheus scrape job.
 
 **`burstgpt_real_replay.py` has Windows-absolute defaults.** `DATASET_PATH` and
 `ARTIFACT_ROOT` default to `C:\Users\alawn\...`. Both must be overridden on any
@@ -566,10 +621,10 @@ them for scripts that no longer exist (`aiperf_with_push.py`,
    inside a `prom/prometheus:latest` container.
 
 **Stage 2, `build-images-dryrun`** (only when the ref is not `main`): builds all
-five images with `push: false` as a matrix, `fail-fast: false`.
+four images with `push: false` as a matrix, `fail-fast: false`.
 
 **Stage 3, `publish-images`** (only on a push to `main`): logs in to Docker Hub
-with `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` and pushes the same five images,
+with `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` and pushes the same four images,
 each tagged `:latest` and `:<commit sha>`:
 
 | Image | Dockerfile |
@@ -577,10 +632,9 @@ each tagged `:latest` and `:<commit sha>`:
 | `llm-observability-api` | `api/Dockerfile` |
 | `llm-observability-grafana` | `docker/grafana/Dockerfile` |
 | `llm-observability-prometheus` | `docker/prometheus/Dockerfile` |
-| `llm-observability-pushgateway` | `docker/pushgateway/Dockerfile` |
 | `llm-observability-nvml-exporter` | `monitoring/exporters/Dockerfile.nvml` |
 
-All five use the repository root as build context.
+All four use the repository root as build context.
 
 ## API reference
 
