@@ -28,7 +28,7 @@ import json
 import logging
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 - used only with list argv and no shell
 import threading
 import time
 from pathlib import Path
@@ -115,8 +115,8 @@ def query_prometheus(query: str):
         result = r.json().get("data", {}).get("result", [])
         if result:
             return float(result[0]["value"][1])
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("Prometheus query failed (%s): %s", query, exc)
     return None
 
 
@@ -185,7 +185,7 @@ def run_scenario(scenario: str, artifact_dir: Path) -> int:
     command = build_aiperf_command(artifact_dir)
     log.info("[%s] starting AIPerf: %s", scenario, " ".join(command))
 
-    process = subprocess.Popen(command)
+    process = subprocess.Popen(command)  # nosec B603 - list argv, no shell; executable from shutil.which, args from module config
     try:
         rc = process.wait()
     finally:

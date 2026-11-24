@@ -15,7 +15,8 @@ import csv
 import json
 import logging
 import re
-import subprocess
+import shutil
+import subprocess  # nosec B404 - used only with list argv and no shell
 from pathlib import Path
 from typing import Any
 
@@ -82,15 +83,29 @@ def parse_aiperf_csv(path: Path) -> dict[str, float]:
     return metrics
 
 
+_TOOL_PATHS: dict[str, str] = {}
+
+
+def _require(tool: str) -> str:
+    """Resolve a tool to its full path once, so no partial path is executed."""
+    path = _TOOL_PATHS.get(tool)
+    if path is None:
+        path = shutil.which(tool)
+        if path is None:
+            raise RuntimeError(f"{tool} not found on PATH")
+        _TOOL_PATHS[tool] = path
+    return path
+
+
 def git_sha(repo_root: Path) -> str:
     """Return the current commit SHA, or 'unknown' outside a git tree."""
     try:
         out = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-parse", "--short", "HEAD"],  # nosec B603 - fixed argv, no shell, no user input
+            [_require("git"), "-C", str(repo_root), "rev-parse", "--short", "HEAD"],  # nosec B603 - fixed argv, no shell, no user input
             capture_output=True, text=True, timeout=10, check=True,
         )
         return out.stdout.strip()
-    except (subprocess.SubprocessError, OSError):
+    except (subprocess.SubprocessError, OSError, RuntimeError):
         return "unknown"
 
 
@@ -99,7 +114,7 @@ def docker_state(container: str = "vllm") -> dict[str, Any]:
     fmt = "{{.RestartCount}}|{{.State.ExitCode}}|{{.State.OOMKilled}}|{{.State.Status}}"
     try:
         out = subprocess.run(
-            ["docker", "inspect", container, "--format", fmt],  # nosec B603 - fixed argv, no shell, no user input
+            [_require("docker"), "inspect", container, "--format", fmt],  # nosec B603 - fixed argv, no shell, no user input
             capture_output=True, text=True, timeout=15, check=True,
         )
         restarts, exit_code, oom, status = out.stdout.strip().split("|")
@@ -109,7 +124,7 @@ def docker_state(container: str = "vllm") -> dict[str, Any]:
             "oom_killed": oom.lower() == "true",
             "status": status,
         }
-    except (subprocess.SubprocessError, OSError, ValueError) as exc:
+    except (subprocess.SubprocessError, OSError, ValueError, RuntimeError) as exc:
         log.warning("docker inspect unavailable: %s", exc)
         return {}
 
