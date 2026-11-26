@@ -5,7 +5,7 @@
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
   "panels": [
-    { "type": "row", "title": "Scenario Replay (Pushgateway)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "panels": [] },
+    { "type": "row", "title": "Scenario Replay (OTel)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "panels": [] },
     {
       "title": "TTFT (ms) by Scenario",
       "type": "timeseries",
