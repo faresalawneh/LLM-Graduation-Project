@@ -21,7 +21,7 @@ and is the default.
 
 The old jsonl-tail + Pushgateway path was removed: aiperf 0.11 only flushes
 profile_export.jsonl at end of run, so tailing gave no live data. The
-reference implementation lives on in aiperf_with_push.py.
+old implementation was removed; see git history.
 """
 
 import json
@@ -38,7 +38,7 @@ import requests
 
 # ── Config ────────────────────────────────────────────────────────────────────
 INFERENCE_URL   = os.getenv("INFERENCE_URL", "http://localhost:8000")
-MODEL           = os.getenv("MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
+MODEL           = os.getenv("MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
 TRACE_FILE      = Path(os.getenv("TRACE_FILE", "test_trace.csv"))
 SCENARIO        = os.getenv("SCENARIO", "steady")   # "steady" | "burst"
 ARTIFACT_ROOT   = Path(os.getenv("ARTIFACT_ROOT", "aiperf_results"))
