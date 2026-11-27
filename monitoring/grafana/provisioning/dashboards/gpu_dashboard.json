@@ -7,7 +7,7 @@
   "panels": [
     {
       "title": "SM Clock (MHz) - utilization proxy",
-      "description": "DCGM_FI_DEV_GPU_UTIL returns 0 on P40, so SM clock is used as the utilization proxy. Idle clock is low; under load it ramps to max boost.",
+      "description": "SM clock is used as the utilization proxy (on the GP1 Tesla P40, DCGM_FI_DEV_GPU_UTIL read 0). Idle clock is low; under load it ramps to max boost.",
       "type": "timeseries",
       "targets": [{ "expr": "DCGM_FI_DEV_SM_CLOCK", "legendFormat": "GPU {{gpu}}" }],
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },

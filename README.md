@@ -135,7 +135,7 @@ metric names and labels (`gpu`, `UUID`, `modelName`, plus `source="nvml"`) on th
 same port 9400, so Prometheus and the Grafana dashboards work unchanged. Only
 `DCGM_FI_DEV_*` gauges are covered. `DCGM_FI_PROF_*` profiling counters are
 DCP-family only and do not exist on this path, which is why the PCIe throughput
-panel in the GPU dashboard stays empty. Power and temperature are frequently
+panel in the GPU dashboard shows a note instead of data. Power and temperature are frequently
 unsupported under WSL2; each field is probed individually and skipped rather
 than failing the whole scrape.
 
@@ -559,7 +559,7 @@ those in place before each run.
 
 **DCGM cannot run under WSL2.** `nvml-exporter` stands in for DCGM Exporter on
 port 9400 with the same metric names. `DCGM_FI_PROF_*` counters do not exist on
-this path, so the PCIe panel in the GPU dashboard is always empty, and power
+this path, so the PCIe panel in the GPU dashboard shows a note instead of data, and power
 and temperature may be missing depending on driver support.
 
 **Only the `local` profile exists.** Services with no profile (Prometheus,
