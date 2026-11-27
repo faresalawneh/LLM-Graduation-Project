@@ -1,0 +1,8 @@
+# API runtime plus test/scan tools, for CI and local testing (not the image).
+-r requirements.txt
+# Same pytest as the root requirements.txt. pytest 9.2.0 fails here: the dash
+# plugin pulled in by the root file triggers PytestRemovedIn10Warning, which
+# pytest.ini turns into an error.
+pytest==9.1.1
+httpx==0.29.0
+bandit==1.9.4

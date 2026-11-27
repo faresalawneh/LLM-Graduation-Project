@@ -323,7 +323,8 @@ environment to test a remote deployment.
 | `api/app.py` | FastAPI service: health, auth, metrics summary, GPU, vLLM, alert thresholds CRUD |
 | `api/auth.py` | JWT issue/verify, bcrypt password check, role dependency |
 | `api/test_app.py` | 30 API tests, run in CI |
-| `api/Dockerfile`, `api/requirements.txt`, `api/docker-compose.yml` | API image and standalone run |
+| `api/Dockerfile`, `api/requirements.txt`, `api/docker-compose.yml` | API image (fully pinned runtime dependencies) and standalone run |
+| `api/requirements-dev.txt` | API runtime plus pytest, httpx and bandit; installed by CI, not shipped in the image |
 | `api/postman/` | Postman collection and local environment; run with Newman in CI |
 | `docker/prometheus/Dockerfile` | Prometheus with `prometheus.yml` baked in |
 | `docker/grafana/Dockerfile` | Grafana with provisioning baked in |
@@ -629,7 +630,8 @@ them for scripts that no longer exist (`aiperf_with_push.py`,
 
 **Stage 1, `build-and-test`** (every trigger, Ubuntu, Python 3.12):
 
-1. Install `requirements.txt` and `api/requirements.txt`.
+1. Install `requirements.txt` and `api/requirements-dev.txt` (the pinned API
+   runtime plus pytest, httpx and bandit).
    `requirements-experiments.txt` is deliberately not installed, so
    `mlflow_log_run.py` is not exercised.
 2. `pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v` with
