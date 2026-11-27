@@ -16,7 +16,10 @@ services:
       - "5000:5000"
     environment:
       - PROMETHEUS_URL=${PROMETHEUS_URL:-http://prometheus:9090}
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in api/.env (copy api/.env.example)}
+      - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD:?set API_ADMIN_PASSWORD in api/.env}
+      - API_VIEWER_PASSWORD=${API_VIEWER_PASSWORD:-}
+      - JWT_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-60}
     networks:
       - monitoring
     restart: unless-stopped

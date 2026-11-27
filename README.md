@@ -60,7 +60,7 @@ degradation on one machine.
 - Automated remediation (load shedding, autoscaling, request routing)
 - A trained prediction model for degradation (O4 uses a threshold-based leading indicator only)
 - DCGM profiling counters (`DCGM_FI_PROF_*`) and anything requiring DCGM on WSL2
-- Production hardening (secrets management, multi-user accounts, TLS, HA Prometheus)
+- Production hardening (a secrets manager, multi-user accounts, TLS, HA Prometheus)
 - Alerting integrations (email, Slack, PagerDuty)
 
 ## Architecture
@@ -177,6 +177,9 @@ unset or ends in `:latest`.
 cp monitoring/.env.example monitoring/.env
 ```
 
+Then set `GRAFANA_ADMIN_PASSWORD` in it; compose will not start Grafana
+without one.
+
 ### 4. Start the stack
 
 ```bash
@@ -223,7 +226,7 @@ curl -sf http://localhost:9400/metrics     # GPU exporter
 curl -s  http://localhost:8889/metrics | grep ttft_ms   # collector output, during/after a run
 ```
 
-Grafana is at `http://localhost:3000` (admin / admin), with both dashboards
+Grafana is at `http://localhost:3000` (user `admin`, password `GRAFANA_ADMIN_PASSWORD`), with both dashboards
 provisioned automatically. Prometheus target health is at
 `http://localhost:9090/targets`.
 
@@ -239,6 +242,13 @@ In the UI, toggle "Model training" (not GenAI) at top left, then open the
 `inferscope-gp2` experiment.
 
 ### 8. Run the API
+
+Set the API credentials once (see
+[Identity management and roles](#identity-management-and-roles)):
+
+```bash
+cp api/.env.example api/.env   # then fill in JWT_SECRET and both passwords
+```
 
 Start the monitoring stack first (step above), then:
 
@@ -257,14 +267,14 @@ It pulls the image CI publishes from `main`,
 `DOCKERHUB_NAMESPACE` and the tag with `API_IMAGE_TAG`).
 Without the monitoring stack the network does not exist and `up` fails; to run
 the API alone on the host use
-`PROMETHEUS_URL=http://localhost:9090 python api/app.py` instead.
+`PROMETHEUS_URL=http://localhost:9090 python api/app.py` instead. It reads `api/.env` too.
 
 Swagger UI is at `http://localhost:5000/docs`. Alert thresholds are a full CRUD
 resource at `/thresholds` (POST/GET for any logged-in user, PUT/DELETE admin
 only; stored in memory, so they reset when the container restarts):
 
 ```bash
-TOKEN=$(curl -s -d 'username=admin&password=admin123' http://localhost:5000/auth/token | jq -r .access_token)
+TOKEN=$(curl -s -d "username=admin&password=$API_ADMIN_PASSWORD" http://localhost:5000/auth/token | jq -r .access_token)
 curl -s -X POST http://localhost:5000/thresholds -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"High TTFT","metric":"ttft_ms","operator":">","value":500}'
@@ -272,8 +282,10 @@ curl -s -X POST http://localhost:5000/thresholds -H "Authorization: Bearer $TOKE
 
 ### 9. Test the API (Swagger and Postman)
 
-Demo users: `admin` / `admin123` (all endpoints) and `viewer` / `viewer123`
-(no `/gpu`, `/vllm`, or threshold PUT/DELETE; those return 403).
+Users are `admin` (all endpoints) and `viewer` (no `/gpu`, `/vllm`, or
+threshold PUT/DELETE; those return 403), with the passwords you set in
+`api/.env`. The Postman `local` environment expects `admin123` / `viewer123`;
+change it there if you chose other passwords.
 
 **Swagger.** Open `http://localhost:5000/docs`, click **Authorize**, enter a
 username and password (leave client id/secret empty), then use **Try it out**
@@ -323,6 +335,8 @@ environment to test a remote deployment.
 | `api/app.py` | FastAPI service: health, auth, metrics summary, GPU, vLLM, alert thresholds CRUD |
 | `api/auth.py` | JWT issue/verify, bcrypt password check, role dependency |
 | `api/test_app.py` | 30 API tests, run in CI |
+| `api/test_auth.py` | 46 identity tests (token rejection, role x endpoint matrix, README table check, config), run in CI |
+| `api/conftest.py`, `api/.env.example` | Test-only credentials; template for `api/.env` |
 | `api/Dockerfile`, `api/requirements.txt`, `api/docker-compose.yml` | API image (fully pinned runtime dependencies) and standalone run |
 | `api/requirements-dev.txt` | API runtime plus pytest, httpx and bandit; installed by CI, not shipped in the image |
 | `api/postman/` | Postman collection and local environment; run with Newman in CI |
@@ -350,7 +364,7 @@ Generated at runtime and gitignored: `artifacts/`, `mlruns/`, `monitoring/logs/`
 | `monitoring/scripts/make_test_trace.py` | Writes a 10-row BurstGPT-format CSV spanning ~10s | Optional `TRACE_FILE` (default `test_trace.csv`) | That CSV |
 | `monitoring/scripts/burstgpt_real_replay.py` | Legacy: reads the full BurstGPT CSV, replays buckets 21661 and 23832 with raw `requests`, pushes to Pushgateway :9091 | `DATASET_PATH`, `ARTIFACT_ROOT` (Windows-absolute defaults), `INFERENCE_URL`, `MODEL`, `MAX_CONCURRENCY`, `REQUEST_TIMEOUT`, `ENABLE_GPU_SCRAPE` | `<ARTIFACT_ROOT>/{steady,burst}_replay/` with `profile_export.jsonl` and `summary.json` |
 | `monitoring/exporters/nvml_exporter.py` | Serves NVML readings as DCGM-named Prometheus gauges | Optional `NVML_EXPORTER_PORT` (default 9400), `LOG_LEVEL` | `/metrics` on that port |
-| `api/app.py` | FastAPI service | Optional `JWT_SECRET`, `PROMETHEUS_URL` (default `http://localhost:9090`) | Serves on 0.0.0.0:5000 |
+| `api/app.py` | FastAPI service | `JWT_SECRET`, `API_ADMIN_PASSWORD`, `API_VIEWER_PASSWORD` (env or `api/.env`), `PROMETHEUS_URL` (default `http://localhost:9090`) | Serves on 0.0.0.0:5000 |
 
 ## Configuration
 
@@ -367,8 +381,8 @@ What to change before running on a different machine:
 | Venv path | `AIPERF_VENV` env var, default `~/venvs/aiperf-env` | Honoured by `run_experiment.sh` and `mlflow_ui.sh`. `run_local_replay.sh` only prints this path in its error message and requires `aiperf` already on PATH |
 | MLflow host tag | `monitoring/scripts/mlflow_log_run.py`, `"host": "msi-rtx5060-wsl2"` | Hardcoded on every run |
 | Prometheus URL used by the API | `PROMETHEUS_URL` env var, default `http://localhost:9090` | `api/docker-compose.yml` sets it to `http://prometheus:9090` and attaches the API to the monitoring network (`MONITORING_NETWORK`, default `monitoring_monitoring`). When running the API on the host, the default is correct |
-| API credentials and JWT secret | `api/auth.py` `USERS_DB`, `JWT_SECRET` env var | Users are hardcoded with bcrypt hashes. Default secret is `dev-secret-change-in-production` |
-| Grafana admin password | `monitoring/docker-compose.yml` and `docker/grafana/Dockerfile`, `GF_SECURITY_ADMIN_PASSWORD=admin` | Baked into the published image as well |
+| API credentials and JWT secret | `api/.env` (copy of `api/.env.example`) or environment: `JWT_SECRET`, `API_ADMIN_PASSWORD`, `API_VIEWER_PASSWORD` | Nothing in source. See [Identity management and roles](#identity-management-and-roles) |
+| Grafana admin password | `monitoring/.env`, `GRAFANA_ADMIN_PASSWORD` | Required; compose refuses to start without it. Only applied when the `grafana_data` volume is first created |
 | Full BurstGPT dataset path | `slice_burstgpt_window.py --input`, or `DATASET_PATH` for the legacy script | The full CSV is not in the repo. `.gitignore` expects it at `monitoring/BurstGPT_without_fails_3.csv` |
 
 ## Dev and demo environments
@@ -426,7 +440,7 @@ API:
 
 ```bash
 docker pull mahmoudalwaqfi/llm-observability-api:latest
-docker run -d --name llm-api -p 5000:5000 mahmoudalwaqfi/llm-observability-api:latest
+docker run -d --name llm-api -p 5000:5000 --env-file api/.env mahmoudalwaqfi/llm-observability-api:latest
 curl http://localhost:5000/health
 ```
 
@@ -442,7 +456,7 @@ Grafana (needs about 10 seconds before `/api/health` answers):
 
 ```bash
 docker pull mahmoudalwaqfi/llm-observability-grafana:latest
-docker run -d --name llm-grafana -p 3000:3000 mahmoudalwaqfi/llm-observability-grafana:latest
+docker run -d --name llm-grafana -p 3000:3000 -e GF_SECURITY_ADMIN_PASSWORD="$GRAFANA_ADMIN_PASSWORD" mahmoudalwaqfi/llm-observability-grafana:latest
 curl http://localhost:3000/api/health
 ```
 
@@ -513,7 +527,7 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile local 
 | Prometheus | 9090 | always | Scrapes otel-collector, GPU exporter, vLLM |
 | otel-collector | 4318 | always | OTLP/HTTP receiver, target of `--otel-url` |
 | otel-collector | 8889 | always | Prometheus-format output, scraped by the `otel_collector` job |
-| Grafana | 3000 | always | admin / admin, dashboards provisioned |
+| Grafana | 3000 | always | `admin` / `GRAFANA_ADMIN_PASSWORD`, dashboards provisioned |
 | nvml-exporter | 9400 | `local` | Built from `monitoring/exporters/Dockerfile.nvml` |
 | vLLM | 8000 | `local` | OpenAI-compatible server; `/metrics` scraped by the `vllm` job |
 | ollama | 11434 | `local` | Commented out |
@@ -634,11 +648,11 @@ them for scripts that no longer exist (`aiperf_with_push.py`,
    runtime plus pytest, httpx and bandit).
    `requirements-experiments.txt` is deliberately not installed, so
    `mlflow_log_run.py` is not exercised.
-2. `pytest api/test_app.py monitoring/exporters/test_nvml_exporter.py -v` with
-   `PYTHONPATH=api`. 30 API tests plus 3 exporter tests. `pytest.ini` turns
+2. `pytest api/test_app.py api/test_auth.py monitoring/exporters/test_nvml_exporter.py -v` with
+   `PYTHONPATH=api`. 76 API tests plus 3 exporter tests. `pytest.ini` turns
    warnings into errors, with one starlette/httpx deprecation ignored.
-3. `bandit -r api monitoring -x api/test_app.py,monitoring/exporters/test_nvml_exporter.py`.
-   The two test files are excluded because `assert` and demo passwords are expected there.
+3. `bandit -r api monitoring -x api/test_app.py,api/test_auth.py,api/conftest.py,monitoring/exporters/test_nvml_exporter.py`.
+   The test files are excluded because `assert` and demo passwords are expected there.
    Bandit lists discovered paths without a `./` prefix, so the exclude entries must not
    carry one.
 4. `promtool check config` on `monitoring/prometheus/prometheus.yml`, run
@@ -670,11 +684,50 @@ All four use the repository root as build context.
 | GET | `/metrics/summary` | any authenticated user | `ttft_ms`, `latency_ms`, `throughput_tokens_per_sec`, each split into `steady` and `burst` |
 | GET | `/gpu` | admin | SM clock, framebuffer used, temperature, power |
 | GET | `/vllm` | admin | Requests waiting, requests running, KV cache usage |
+| POST | `/thresholds` | any authenticated user | Created threshold, 201 |
+| GET | `/thresholds` | any authenticated user | All thresholds |
+| GET | `/thresholds/{id}` | any authenticated user | One threshold, 404 if missing |
+| PUT | `/thresholds/{id}` | admin | Updated threshold, 404 if missing |
+| DELETE | `/thresholds/{id}` | admin | 204, 404 if missing |
 
-Roles are `admin` and `viewer`; `require_role` grants admin access to
-everything. Demo credentials `admin / admin123` and `viewer / viewer123` are
-hardcoded in `api/auth.py`. Any field the Prometheus query cannot resolve comes
-back as `null` rather than an error.
+Any field the Prometheus query cannot resolve comes back as `null` rather than
+an error.
+
+### Identity management and roles
+
+The API issues its own JWTs (HS256, OAuth2 password flow at `/auth/token`). We
+considered Microsoft Entra ID and decided to keep JWT for the MVP: the API has
+two fixed roles and runs on a single laptop, so an external identity provider
+adds setup without changing what the API protects.
+
+| Role | Can do | Gets 403 on |
+|---|---|---|
+| `admin` | Everything (`require_role` lets admin through every role check) | Nothing |
+| `viewer` | `/metrics/summary`, create/list/get thresholds | `/gpu`, `/vllm`, `PUT` and `DELETE /thresholds/{id}` |
+| no token | `/`, `/health`, `/docs`, `/auth/token` | 401 on everything else |
+
+A request gets **401** when the token is missing, expired, signed with another
+key, edited after signing, uses `alg: none`, or lacks a valid `sub`/`role`
+claim. It gets **403** when the token is valid but the role is not allowed.
+`api/test_auth.py` checks every cell of this table and every rejection case,
+and fails if this README table and the routes in `app.py` drift apart.
+
+**Configuration.** No credentials are in the source. `api/auth.py` reads them
+from the environment, or from `api/.env` when you run `python app.py` on the
+host (copy `api/.env.example`; `api/.env` is gitignored):
+
+| Variable | Purpose | If unset |
+|---|---|---|
+| `JWT_SECRET` | HMAC signing key, at least 32 characters | A random key per process: tokens stop working after a restart |
+| `API_ADMIN_PASSWORD` | Password for user `admin` | Admin login disabled |
+| `API_VIEWER_PASSWORD` | Password for user `viewer` | Viewer login disabled |
+| `JWT_EXPIRE_MINUTES` | Token lifetime | 60 |
+
+Generate a secret with
+`python -c "import secrets; print(secrets.token_urlsafe(48))"`. Passwords are
+bcrypt-hashed when the API starts; only the hash is kept in memory. The tests
+and CI use `admin123` / `viewer123`, which are also the values in the Postman
+`local` environment.
 
 ## Not implemented yet
 
