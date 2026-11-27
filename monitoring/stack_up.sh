@@ -74,11 +74,19 @@ done
 # Provenance for run_manifest / MLflow
 DIGEST="$(docker inspect "${IMG}" --format '{{index .RepoDigests 0}}' 2>/dev/null || echo "unknown")"
 BASELINE="$(docker inspect vllm --format '{{.RestartCount}}' 2>/dev/null || echo 0)"
+# Revision in the model cache volume, as the vllm container sees it.
+QWEN_REFS=/root/.cache/huggingface/hub/models--Qwen--Qwen2.5-1.5B-Instruct/refs/main
+QWEN_REVISION="$(docker exec vllm cat "${QWEN_REFS}" 2>/dev/null || true)"
+if ! [[ "${QWEN_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "WARN: Qwen revision unavailable (no valid refs/main in vllm)" >&2
+  QWEN_REVISION="unavailable"
+fi
 cat > "${LOG_DIR}/stack_state.json" <<EOF
 {
   "stack_env": "${STACK_ENV}",
   "vllm_image": "${IMG}",
   "vllm_digest": "${DIGEST}",
+  "qwen_revision": "${QWEN_REVISION}",
   "restart_count_at_start": ${BASELINE},
   "stack_up_time": "$(date -Iseconds)"
 }

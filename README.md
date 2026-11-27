@@ -324,14 +324,22 @@ python3 monitoring/scripts/start_run.py --down                          # stop i
 python3 monitoring/scripts/start_run.py --mlflow-ui                     # http://localhost:5001
 ```
 
-`--type` and `--up` print a plan and continue only if you type exactly `yes`.
-There is no bypass flag. `--type` calls `run_experiment.sh`, so a run starts the
+`--type` and `--up` first require every preflight check to pass: clean git tree,
+GPU, `VLLM_IMAGE`, Grafana password, vLLM image pulled, Qwen cache present and
+at the expected revision. They then print a plan and continue only if you type
+exactly `yes`. There is no bypass flag, and `yes` cannot override a failed
+check. With `--runs`, the checks are repeated before each later run. `--type` calls `run_experiment.sh`, so a run starts the
 stack if it is not already up. Starting the stack pulls any other missing
 compose image and builds `nvml-exporter`.
 
-`--preflight` does not run automatically before a run. It may start a
-short-lived container from the already pulled vLLM image, with no GPU and no
-network, to read the model cache. A zero exit code from a run does not rule out
+Preflight needs the model already in the `monitoring_hf_cache` volume. It may
+start a short-lived container from the already pulled vLLM image, with no GPU and no
+network, to read the model cache.
+
+The replay never edits the tracked traces: it uses an LF copy under
+`.trace.*` in the artifact directory. MLflow also records `qwen_revision`,
+`max_concurrency`, `git_dirty`, and the original trace path and SHA-256, or
+`unavailable` for any that were not captured. A zero exit code from a run does not rule out
 a vLLM restart: check the crash check output.
 
 ## Repo layout

@@ -38,6 +38,14 @@ _UNSAFE = re.compile(r"[^0-9a-zA-Z_\-. :/]+")
 # Add filenames here to exclude them.
 SKIP_ARTIFACTS: frozenset[str] = frozenset()
 
+UNAVAILABLE = "unavailable"
+# Written by run_local_replay.sh next to the LF copy of the trace it replays.
+TRACE_PROVENANCE_FILE = "trace_provenance.json"
+PROVENANCE_KEYS = (
+    "max_concurrency", "git_dirty",
+    "trace_original_path", "trace_original_sha256",
+)
+
 
 
 def sanitize(name: str) -> str:
@@ -81,6 +89,49 @@ def parse_aiperf_csv(path: Path) -> dict[str, float]:
                 except ValueError:
                     continue
     return metrics
+
+
+def read_trace_provenance(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Load the run-time record that belongs to the manifest's trace.
+
+    Returns an empty dict if there is none, or if the record names a different
+    trace file from the one the run replayed.
+    """
+    trace = manifest.get("trace_file")
+    if not trace:
+        return {}
+    path = Path(trace).parent / TRACE_PROVENANCE_FILE
+    if not path.is_file():
+        return {}
+    record = read_json(path)
+    if record.get("trace_used") != trace:
+        log.warning("%s describes a different trace; ignoring it", path)
+        return {}
+    return record
+
+
+def run_provenance(
+    manifest: dict[str, Any], stack: dict[str, Any]
+) -> dict[str, str]:
+    """Collect reproducibility params, never filling a gap with a guess.
+
+    Args:
+        manifest: Contents of the run's run_manifest.json.
+        stack: Contents of stack_state.json.
+
+    Returns:
+        Every param, with "unavailable" for any value that was not recorded.
+    """
+    record = read_trace_provenance(manifest)
+    found = {"qwen_revision": stack.get("qwen_revision")}
+    found.update({key: record.get(key) for key in PROVENANCE_KEYS})
+    params: dict[str, str] = {}
+    for key, value in found.items():
+        if value in (None, "", UNAVAILABLE):
+            log.warning("%s unavailable; logging it as such", key)
+            value = UNAVAILABLE
+        params[key] = str(value)
+    return params
 
 
 _TOOL_PATHS: dict[str, str] = {}
@@ -202,6 +253,7 @@ def main() -> int:
             "git_sha": git_sha(repo_root),
             "stack_env": stack_env,
         }
+        params.update(run_provenance(manifest, stack))
         mlflow.log_params({k: v for k, v in params.items() if v is not None})
 
         metrics = parse_aiperf_csv(run_dir / "profile_export_aiperf.csv")

@@ -182,18 +182,62 @@ def test_failed_run_stops_the_rest(system, repo):
     assert len([c for c in system.calls if c[0] == "bash"]) == 2
 
 
-@pytest.mark.parametrize("change, message", [
-    ({"pulled": False}, "is not pulled"),
-    ({"volumes": []}, "Qwen cache missing"),
-])
-def test_real_run_raises_before_the_gate(system, repo, change, message):
-    for key, value in change.items():
+BLOCKERS = {
+    "git tree": ({"dirty": True}, None),
+    "GPU": ({"gpu": False}, None),
+    "vLLM variable": ({}, f"GRAFANA_ADMIN_PASSWORD={SECRET}\n"),
+    "Grafana password": ({}, f"VLLM_IMAGE={IMAGE}\nGRAFANA_ADMIN_PASSWORD=\n"),
+    "vLLM image": ({"pulled": False}, None),
+    "Qwen cache": ({"volumes": []}, None),
+    "Qwen revision": ({"revision": "c" * 40}, None),
+}
+
+
+@pytest.mark.parametrize("action", ["smoke", "steady", "burst", "up"])
+@pytest.mark.parametrize("check", list(BLOCKERS))
+def test_each_failed_check_blocks_before_the_gate(
+        system, repo, check, action, caplog):
+    changes, env = BLOCKERS[check]
+    for key, value in changes.items():
         setattr(system, key, value)
-    controller, prompts = make_controller(repo)
-    with pytest.raises(start_run.RunError, match=message):
-        controller.run("smoke", 1, True, False)
+    if env is not None:
+        write_env(repo, env)
+    controller, prompts = make_controller(repo, "yes")
+    with pytest.raises(start_run.RunError, match="blocked by preflight.*" + check):
+        controller.up() if action == "up" else controller.run(action, 1, True, False)
     assert prompts == []
     assert not [c for c in system.calls if c[0] == "bash"]
+    assert SECRET not in caplog.text
+
+
+def test_blockers_cover_every_preflight_check(system, repo):
+    controller, _ = make_controller(repo)
+    assert [r.name for r in controller.preflight_checks()] == list(BLOCKERS)
+
+
+def test_preflight_is_repeated_before_each_later_run(system, repo):
+    def ask(prompt):
+        return "yes"
+
+    controller, _ = make_controller(repo)
+    controller.ask = ask
+    real_stream = controller.shell.stream
+
+    def stream_then_dirty(*args, **kwargs):
+        code = real_stream(*args, **kwargs)
+        system.dirty = True
+        return code
+
+    controller.shell.stream = stream_then_dirty
+    with pytest.raises(start_run.RunError, match="blocked by preflight: git tree"):
+        controller.run("steady", 3, True, False)
+    assert len([c for c in system.calls if c[0] == "bash"]) == 1
+
+
+def test_no_bypass_option_exists(capsys):
+    for flag in ("--force", "--yes", "-y", "--skip-preflight", "--no-preflight"):
+        with pytest.raises(SystemExit):
+            start_run.parse_args(["--type", "smoke", flag])
 
 
 def test_up_is_gated(system, repo):

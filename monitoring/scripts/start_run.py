@@ -377,7 +377,7 @@ class RunController:
         """Collect the facts shown before the gate.
 
         A dry run reports facts it cannot read as unavailable. A real action
-        raises instead, except that --up may start with no Qwen cache.
+        raises instead.
 
         Args:
             action: A run type, or "up".
@@ -407,7 +407,7 @@ class RunController:
             if revision != EXPECTED_QWEN_REVISION:
                 revision += f"  MISMATCH, expected {EXPECTED_QWEN_REVISION}"
         except RunError as exc:
-            if not dry_run and action != "up":
+            if not dry_run:
                 raise
             revision = f"unavailable: {exc}"
 
@@ -437,15 +437,36 @@ class RunController:
         for label, value in plan:
             log.info("  %-18s %s", label, value)
 
+    def require_preflight(self) -> None:
+        """Block the action unless every preflight check passes.
+
+        There is no bypass, and the gate cannot override a failure.
+
+        Raises:
+            RunError: Naming each failed check.
+        """
+        failed = [r for r in self.preflight_checks() if not r.ok]
+        for result in failed:
+            log.error("FAIL  %-16s %s", result.name, result.detail)
+        if failed:
+            raise RunError(
+                "blocked by preflight: "
+                + ", ".join(result.name for result in failed))
+
     def run(self, run_type: str, runs: int, use_mlflow: bool, dry_run: bool) -> int:
-        """Show the plan, pass the gate and call run_experiment.sh.
+        """Pass preflight and the gate, then call run_experiment.sh.
+
+        Preflight is repeated before each later run of the same invocation.
 
         Returns:
             0 on success or after a dry run, 1 if the gate is refused.
 
         Raises:
-            RunError: If a run exits non-zero; later runs are not started.
+            RunError: If preflight fails, or a run exits non-zero; later runs
+                are not started.
         """
+        if not dry_run:
+            self.require_preflight()
         self.show_plan(self.build_plan(run_type, runs, use_mlflow, dry_run))
         if dry_run:
             log.info("dry run: nothing started")
@@ -456,6 +477,8 @@ class RunController:
         script = self.inspector.monitoring_dir / "run_experiment.sh"
         extra = () if use_mlflow else ("--no-mlflow",)
         for number in range(1, runs + 1):
+            if number > 1:
+                self.require_preflight()
             log.info("run %d of %d (%s)", number, runs, run_type)
             code = self.shell.stream(
                 "bash", str(script), run_type, *extra,
@@ -467,7 +490,8 @@ class RunController:
         return 0
 
     def up(self) -> int:
-        """Pass the gate and start the dev stack with stack_up.sh."""
+        """Pass preflight and the gate, then start the dev stack."""
+        self.require_preflight()
         self.show_plan(self.build_plan("up", None, False, False))
         if not self.confirm():
             log.error("not confirmed; nothing started")

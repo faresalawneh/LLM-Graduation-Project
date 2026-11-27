@@ -39,11 +39,14 @@ esac
 command -v aiperf >/dev/null \
   || { echo "aiperf not on PATH - activate venv: source ~/venvs/aiperf-env/bin/activate" >&2; exit 1; }
 
-# LFS checkout re-materializes these with CRLF; normalize idempotently.
-if grep -q $'\r' "$TRACE_FILE"; then
-  echo "normalizing CRLF in $(basename "$TRACE_FILE")"
-  sed -i 's/\r$//' "$TRACE_FILE"
-fi
+# LFS checkout materializes these with CRLF. The traces are tracked, so never
+# edit them in place: replay an LF copy and record where it came from, for
+# mlflow_log_run.py. The copy keeps the file name and stays with the artifacts.
+TRACE_ORIGINAL="$(realpath "$TRACE_FILE")"
+mkdir -p "$ARTIFACT_ROOT"
+TRACE_DIR="$(mktemp -d "$(realpath "$ARTIFACT_ROOT")/.trace.XXXXXX")"
+TRACE_FILE="${TRACE_DIR}/$(basename "$TRACE_ORIGINAL")"
+sed 's/\r$//' "$TRACE_ORIGINAL" > "$TRACE_FILE"
 
 # vLLM takes ~60-120s to load the 1.5B model; wait rather than fail.
 VLLM_WAIT="${VLLM_WAIT:-300}"
@@ -64,8 +67,25 @@ curl -sf "localhost:9400/metrics" > /dev/null \
 curl -sf "localhost:9090/-/healthy" > /dev/null \
   || echo "WARN: prometheus down" >&2
 
+# Facts that can only be captured at run time.
+TRACE_SHA256="$(sha256sum "$TRACE_ORIGINAL" | cut -d' ' -f1)"
+if GIT_STATUS="$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null)"; then
+  if [ -n "$GIT_STATUS" ]; then GIT_DIRTY=true; else GIT_DIRTY=false; fi
+else
+  echo "WARN: git status failed - git_dirty unavailable" >&2
+  GIT_DIRTY=unavailable
+fi
+python3 - "${TRACE_DIR}/trace_provenance.json" "$TRACE_FILE" "$TRACE_ORIGINAL" \
+  "$TRACE_SHA256" "$MAX_CONCURRENCY" "$GIT_DIRTY" <<'PYEOF'
+import json, sys
+keys = ("trace_used", "trace_original_path", "trace_original_sha256",
+        "max_concurrency", "git_dirty")
+with open(sys.argv[1], "w") as fh:
+    json.dump(dict(zip(keys, sys.argv[2:])), fh, indent=2)
+PYEOF
+
 echo "scenario=${SCENARIO} model=${MODEL} concurrency=${MAX_CONCURRENCY}"
-echo "trace=${TRACE_FILE}"
+echo "trace=${TRACE_FILE} (LF copy of ${TRACE_ORIGINAL})"
 echo "artifacts=${ARTIFACT_ROOT}"
 echo
 
