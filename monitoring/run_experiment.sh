@@ -73,6 +73,23 @@ else
 fi
 
 BASELINE="$(docker inspect vllm --format '{{.RestartCount}}' 2>/dev/null || echo 0)"
+# Refresh the baseline the MLflow logger subtracts from. stack_up.sh writes this
+# only when the stack is (re)started, so across several runs on a live stack it
+# goes stale and vllm_restarts_during_run reports the cumulative count instead of
+# the per-run delta.
+STATE_FILE="${MON_DIR}/logs/stack_state.json"
+if [ -f "${STATE_FILE}" ]; then
+  python3 - "${STATE_FILE}" "${BASELINE}" <<'PYEOF'
+import json, sys
+path, baseline = sys.argv[1], int(sys.argv[2])
+with open(path) as fh:
+    state = json.load(fh)
+state["restart_count_at_start"] = baseline
+with open(path, "w") as fh:
+    json.dump(state, fh, indent=2)
+PYEOF
+  echo "restart baseline for this run: ${BASELINE}"
+fi
 
 if [ "${SCENARIO}" = "smoke" ]; then
   SMOKE_TRACE="/tmp/burst_smoke.csv"
