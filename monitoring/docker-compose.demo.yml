@@ -9,6 +9,14 @@
 # Needs monitoring/.env (copied from .env.example) with DOCKERHUB_NAMESPACE set
 # to the Docker Hub account CI pushes to, and DEMO_IMAGE_TAG set to the full SHA
 # of the gp2-demo tag. Third-party images are pinned in that file.
+#
+# The demo runs as its own compose project, so it gets its own volumes
+# (inferscope-demo_prometheus_data, _grafana_data, _hf_cache) and network
+# (inferscope-demo_monitoring). Dev data never mixes into the assessed runs.
+# Container names are fixed in docker-compose.yml, so dev and demo cannot run
+# at the same time: bring the other one down first (stack_up.sh checks this).
+
+name: inferscope-demo
 
 services:
   nvml-exporter:

@@ -141,7 +141,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifact_dir", type=Path)
     parser.add_argument("--stack-state", type=Path, default=None)
-    parser.add_argument("--experiment", default="inferscope-gp2")
+    parser.add_argument(
+        "--experiment",
+        default=None,
+        help="MLflow experiment. Default: 'inferscope-gp2-demo' when the "
+             "stack state says stack_env=demo, else 'inferscope-gp2'.",
+    )
     parser.add_argument(
         "--run-type",
         default=None,
@@ -159,18 +164,25 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parents[2]
     mlruns = repo_root / "mlruns"
     mlruns.mkdir(exist_ok=True)
-    tracking = args.tracking_uri or f"sqlite:///{mlruns / 'mlflow.db'}"
-    mlflow.set_tracking_uri(tracking)
-    if mlflow.get_experiment_by_name(args.experiment) is None:
-        mlflow.create_experiment(
-            args.experiment,
-            artifact_location=f"file://{mlruns / 'artifacts'}",
-        )
-    mlflow.set_experiment(args.experiment)
-
-    manifest = read_json(run_dir / "run_manifest.json")
     stack_path = args.stack_state or (repo_root / "monitoring/logs/stack_state.json")
     stack = read_json(stack_path)
+    stack_env = stack.get("stack_env") or "unknown"
+    # Demo (assessed) runs go to their own experiment so they never mix with
+    # dev runs; dev and stacks without a recorded env keep the old default.
+    experiment = args.experiment or (
+        "inferscope-gp2-demo" if stack_env == "demo" else "inferscope-gp2")
+
+    tracking = args.tracking_uri or f"sqlite:///{mlruns / 'mlflow.db'}"
+    mlflow.set_tracking_uri(tracking)
+    if mlflow.get_experiment_by_name(experiment) is None:
+        mlflow.create_experiment(
+            experiment,
+            artifact_location=f"file://{mlruns / 'artifacts'}",
+        )
+    mlflow.set_experiment(experiment)
+    log.info("stack_env=%s -> experiment %s", stack_env, experiment)
+
+    manifest = read_json(run_dir / "run_manifest.json")
     state = docker_state()
 
     scenario = manifest.get("scenario", "unknown")
@@ -188,6 +200,7 @@ def main() -> int:
             "vllm_image": stack.get("vllm_image"),
             "vllm_digest": stack.get("vllm_digest"),
             "git_sha": git_sha(repo_root),
+            "stack_env": stack_env,
         }
         mlflow.log_params({k: v for k, v in params.items() if v is not None})
 
@@ -223,6 +236,7 @@ def main() -> int:
             "run_type": run_type,
             "scenario": scenario,
             "source": "aiperf_trace_replay",
+            "stack_env": stack_env,
             "host": "msi-rtx5060-wsl2",
         })
 
