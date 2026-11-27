@@ -27,7 +27,7 @@ PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://localhost:9090").rstrip("/"
 
 app = FastAPI(
     title="LLM Observability API",
-    description="Real-time observability for vLLM inference serving on Tesla P40",
+    description="Real-time observability for vLLM inference serving on a single GPU",
     version="1.0.0",
 )
 
