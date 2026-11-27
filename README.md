@@ -445,7 +445,7 @@ docker rm -f llm-api llm-prometheus llm-grafana llm-nvml
 
 ### Reproducing the demo
 
-Draft: the tag and image SHA are filled in once the assessed commit is final.
+The image digests that CI published for the tagged commit are recorded in the `gp2-demo` GitHub Release.
 
 ```bash
 git clone https://github.com/faresalawneh/LLM-Graduation-Project.git
@@ -476,11 +476,11 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile local 
 
 | Item | Value |
 |---|---|
-| Git tag | `gp2-demo` (not created yet) |
+| Git tag | `gp2-demo` |
 | `DOCKERHUB_NAMESPACE` | `mahmoudalwaqfi` (the account in the `DOCKERHUB_USERNAME` repo secret; preset in `.env.example`) |
-| `DEMO_IMAGE_TAG` | TBD |
-| `nvml-exporter` image digest | TBD |
-| `llm-observability-api` image digest | TBD |
+| `DEMO_IMAGE_TAG` | Full SHA of the tag: `git rev-parse gp2-demo` |
+| `nvml-exporter` image digest | Listed in the [`gp2-demo` release](https://github.com/faresalawneh/LLM-Graduation-Project/releases/tag/gp2-demo) |
+| `llm-observability-api` image digest | Listed in the [`gp2-demo` release](https://github.com/faresalawneh/LLM-Graduation-Project/releases/tag/gp2-demo) |
 | vLLM image | `vllm/vllm-openai:v0.6.3` |
 | Prometheus image | `prom/prometheus:v3.16.0` |
 | Grafana image | `grafana/grafana:13.3.1` |
