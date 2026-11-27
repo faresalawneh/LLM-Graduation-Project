@@ -32,6 +32,8 @@ services:
       context: ..
       dockerfile: monitoring/exporters/Dockerfile.nvml
     container_name: nvml-exporter
+    # Stable value for the DCGM-style Hostname label (container IDs change on recreate).
+    hostname: ${NVML_EXPORTER_HOSTNAME:-nvml-exporter}
     restart: unless-stopped
     profiles:
       - local
