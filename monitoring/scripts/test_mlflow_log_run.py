@@ -10,9 +10,18 @@ from unittest import mock
 
 import pytest
 
-NEW_PARAMS = ("qwen_revision", "max_concurrency", "git_dirty",
-              "trace_original_path", "trace_original_sha256")
-REVISION = "a" * 40
+LOCK_STATE = {
+    "override_active": "true",
+    "override_sha256": "e" * 64,
+    "model_revision": "a" * 40,
+    "tokenizer_revision": "b" * 40,
+    "hf_hub_offline": "1",
+}
+RUN_KEYS = ("max_concurrency", "git_dirty",
+            "trace_original_path", "trace_original_sha256")
+DIGEST = "vllm/vllm-openai@sha256:" + "f" * 64
+STATE = {**LOCK_STATE, "vllm_digest": DIGEST}
+NEW_PARAMS = (*LOCK_STATE, "vllm_image_digest", *RUN_KEYS)
 
 
 @pytest.fixture
@@ -42,11 +51,24 @@ def write_record(directory, trace_used=None, **changes):
 def test_all_values_are_reported(logger_module, tmp_path):
     module, _ = logger_module
     manifest, record = write_record(tmp_path)
-    params = module.run_provenance(manifest, {"qwen_revision": REVISION})
+    params = module.run_provenance(manifest, STATE)
     assert params == {
-        "qwen_revision": REVISION,
-        **{k: record[k] for k in NEW_PARAMS[1:]},
+        **LOCK_STATE,
+        "vllm_image_digest": DIGEST,
+        **{k: record[k] for k in RUN_KEYS},
     }
+
+
+def test_an_unlocked_stack_is_reported_as_such(logger_module):
+    module, _ = logger_module
+    params = module.run_provenance({}, {
+        "override_active": "false", "model_revision": "unavailable",
+        "vllm_digest": "unknown",
+    })
+    assert params["override_active"] == "false"
+    assert params["model_revision"] == "unavailable"
+    assert params["vllm_image_digest"] == "unavailable"
+    assert "qwen_revision" not in params
 
 
 @pytest.mark.parametrize("manifest", [{}, {"trace_file": "/nowhere/x.csv"}])
@@ -72,8 +94,8 @@ def test_a_record_for_another_trace_is_ignored(logger_module, tmp_path, caplog):
 def test_broken_record_and_unavailable_markers(logger_module, tmp_path):
     module, _ = logger_module
     manifest, _ = write_record(tmp_path, git_dirty="unavailable", max_concurrency="")
-    params = module.run_provenance(manifest, {"qwen_revision": "unavailable"})
-    assert params["qwen_revision"] == "unavailable"
+    params = module.run_provenance(manifest, {"model_revision": "unavailable"})
+    assert params["model_revision"] == "unavailable"
     assert params["git_dirty"] == "unavailable"
     assert params["max_concurrency"] == "unavailable"
     (tmp_path / "trace_provenance.json").write_text("{broken")
@@ -87,7 +109,7 @@ def test_main_logs_the_new_params(logger_module, tmp_path, monkeypatch):
     manifest, _ = write_record(tmp_path)
     (run_dir / "run_manifest.json").write_text(json.dumps(manifest))
     state = tmp_path / "stack_state.json"
-    state.write_text(json.dumps({"qwen_revision": REVISION, "stack_env": "dev"}))
+    state.write_text(json.dumps({**STATE, "stack_env": "dev"}))
     # Keep the logger's mlruns/ inside the temp directory and away from Docker.
     monkeypatch.setattr(module, "__file__", str(tmp_path / "m" / "s" / "x.py"))
     monkeypatch.setattr(module, "docker_state", lambda: {})
@@ -96,7 +118,9 @@ def test_main_logs_the_new_params(logger_module, tmp_path, monkeypatch):
         sys, "argv", ["x", str(run_dir), "--stack-state", str(state)])
     assert module.main() == 0
     logged = fake.log_params.call_args.args[0]
-    assert logged["qwen_revision"] == REVISION
+    for key, value in LOCK_STATE.items():
+        assert logged[key] == value
+    assert logged["vllm_image_digest"] == DIGEST
     assert logged["max_concurrency"] == "7"
     assert logged["git_dirty"] == "false"
     assert logged["trace_original_sha256"] == "d" * 64

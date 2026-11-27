@@ -324,22 +324,32 @@ python3 monitoring/scripts/start_run.py --down                          # stop i
 python3 monitoring/scripts/start_run.py --mlflow-ui                     # http://localhost:5001
 ```
 
+Runs are **version-locked locally**, so that every measured run uses the same
+server and model without changing the repository pins. `start_run.py` layers the
+untracked `monitoring/docker-compose.local.yml` on the compose file. It fixes the
+model and tokenizer commit and sets `HF_HUB_OFFLINE=1`. This is the only
+supported way to start the stack: `stack_up.sh` on its own warns that the version
+is not locked. The file is not in git, so a machine without it fails preflight.
+
 `--type` and `--up` first require every preflight check to pass: clean git tree,
-GPU, `VLLM_IMAGE`, Grafana password, vLLM image pulled, Qwen cache present and
-at the expected revision. They then print a plan and continue only if you type
+GPU, `VLLM_IMAGE`, Grafana password, vLLM image pulled and at the locked digest,
+the override's lock, no drift between the override and `docker-compose.yml`, the
+model snapshot and weights hash, and, if vLLM is already running, that it was
+started locked. They then print a plan and continue only if you type
 exactly `yes`. There is no bypass flag, and `yes` cannot override a failed
 check. With `--runs`, the checks are repeated before each later run. `--type` calls `run_experiment.sh`, so a run starts the
 stack if it is not already up. Starting the stack pulls any other missing
 compose image and builds `nvml-exporter`.
 
 Preflight needs the model already in the `monitoring_hf_cache` volume. It may
-start a short-lived container from the already pulled vLLM image, with no GPU and no
-network, to read the model cache.
+start short-lived containers from the already pulled vLLM image, with no GPU and
+no network, to check the snapshot and hash the weights.
 
 The replay never edits the tracked traces: it uses an LF copy under
-`.trace.*` in the artifact directory. MLflow also records `qwen_revision`,
-`max_concurrency`, `git_dirty`, and the original trace path and SHA-256, or
-`unavailable` for any that were not captured. A zero exit code from a run does not rule out
+`.trace.*` in the artifact directory. MLflow also records the version lock
+(`override_active`, `override_sha256`, `model_revision`, `tokenizer_revision`,
+`hf_hub_offline`, `vllm_image_digest`), `max_concurrency`, `git_dirty`, and the
+original trace path and SHA-256, or `unavailable` for any that were not captured. A zero exit code from a run does not rule out
 a vLLM restart: check the crash check output.
 
 ## Repo layout

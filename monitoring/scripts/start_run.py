@@ -12,6 +12,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import difflib
+import hashlib
 import http.client
 import json
 import logging
@@ -20,6 +22,7 @@ import re
 import shutil
 import subprocess  # nosec B404 - used only with list argv and no shell
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, Sequence
@@ -29,8 +32,23 @@ log = logging.getLogger("start_run")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 RUN_TYPES = ("smoke", "steady", "burst")
-EXPECTED_QWEN_REVISION = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
-QWEN_REFS_FILE = "hub/models--Qwen--Qwen2.5-1.5B-Instruct/refs/main"
+# The locked versions for the T5 runs (#31).
+EXPECTED_MODEL_REVISION = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+EXPECTED_WEIGHTS_SHA256 = (
+    "dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee")
+EXPECTED_VLLM_DIGEST = (
+    "sha256:37cd5bd18d220a0f4c70401ce1d4a0cc588fbfe03cc210579428f2c47e6eac33")
+SNAPSHOT_DIR = ("hub/models--Qwen--Qwen2.5-1.5B-Instruct/snapshots/"
+                + EXPECTED_MODEL_REVISION)
+WEIGHTS_FILE = "model.safetensors"
+# Where compose mounts the cache volume in the vllm service.
+CONTAINER_CACHE = "/root/.cache/huggingface"
+REVISION_FLAGS = ("--revision", "--tokenizer-revision")
+OFFLINE_SETTING = "HF_HUB_OFFLINE=1"
+OVERRIDE_NAME = "docker-compose.local.yml"
+# stack_up.sh layers the override only when this variable names it.
+OVERRIDE_ENV_VAR = "INFERSCOPE_COMPOSE_OVERRIDE"
+HASH_TIMEOUT_S = 900
 # Compose names the dev project after the monitoring/ directory.
 DEV_PROJECT = "monitoring"
 HF_VOLUME = f"{DEV_PROJECT}_hf_cache"
@@ -77,12 +95,15 @@ class Shell:
             raise RunError(f"{tool} not found on PATH")
         return path
 
-    def capture(self, tool: str, *args: str) -> subprocess.CompletedProcess:
+    def capture(
+        self, tool: str, *args: str, timeout: int = 60,
+    ) -> subprocess.CompletedProcess:
         """Run a short command and capture its output.
 
         Args:
             tool: Executable name.
             *args: Arguments passed as a list.
+            timeout: Seconds to wait.
 
         Returns:
             The completed process, whatever its exit code.
@@ -93,7 +114,8 @@ class Shell:
         argv = [self.which(tool), *args]
         try:
             return subprocess.run(  # nosec B603 - list argv, no shell
-                argv, capture_output=True, text=True, timeout=60, check=False,
+                argv, capture_output=True, text=True, timeout=timeout,
+                check=False,
             )
         except (subprocess.SubprocessError, OSError) as exc:
             raise RunError(f"could not run {tool}: {exc}") from exc
@@ -148,6 +170,7 @@ class StackInspector:
         self.shell = shell
         self.repo_root = repo_root
         self.monitoring_dir = repo_root / "monitoring"
+        self.override_path = self.monitoring_dir / OVERRIDE_NAME
 
     def env_value(self, key: str) -> str:
         """Read one variable from monitoring/.env.
@@ -259,8 +282,120 @@ class StackInspector:
             raise RunError(
                 f"the stack is up but {path.name} cannot be read: {exc}") from exc
 
-    def qwen_revision(self, image: str, allow_helper: bool) -> str:
-        """Read the cached Qwen revision that the vLLM container will see.
+    def override_sha256(self) -> str:
+        """Return the override file's SHA-256.
+
+        Raises:
+            RunError: If the override does not exist.
+        """
+        if not self.override_path.is_file():
+            raise RunError(f"override missing: monitoring/{OVERRIDE_NAME}")
+        return hashlib.sha256(self.override_path.read_bytes()).hexdigest()
+
+    def compose_model(self, with_override: bool) -> dict:
+        """Return the compose model without substituting any variable.
+
+        --no-interpolate keeps secrets as literal placeholders, so none is read.
+
+        Args:
+            with_override: Whether to layer the local override.
+
+        Raises:
+            RunError: If compose cannot parse the files.
+        """
+        files = ["-f", str(self.monitoring_dir / "docker-compose.yml")]
+        if with_override:
+            files += ["-f", str(self.override_path)]
+        text = self.shell.output(
+            "docker", "compose", *files, "--profile", "local",
+            "config", "--no-interpolate", "--format", "json")
+        try:
+            model = json.loads(text)
+            model["services"]["vllm"]["command"]
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise RunError(f"unexpected compose config output: {exc!r}") from exc
+        return model
+
+    def version_lock(self) -> str:
+        """Check that the override pins the revision and forces offline mode.
+
+        Returns:
+            A short description of the lock.
+
+        Raises:
+            RunError: If the override is missing or does not lock all three.
+        """
+        digest = self.override_sha256()
+        vllm = self.compose_model(with_override=True)["services"]["vllm"]
+        command = vllm["command"]
+        for flag in REVISION_FLAGS:
+            values = [command[i + 1] for i, item in enumerate(command[:-1])
+                      if item == flag]
+            if values != [EXPECTED_MODEL_REVISION]:
+                raise RunError(
+                    f"override must set {flag} {EXPECTED_MODEL_REVISION} "
+                    f"exactly once (found {values or 'none'})")
+        offline = [item for item in vllm.get("environment") or []
+                   if item.startswith("HF_HUB_OFFLINE=")]
+        if offline != [OFFLINE_SETTING]:
+            raise RunError(f"override must set {OFFLINE_SETTING}")
+        return f"revision and offline mode locked, sha256 {digest}"
+
+    def compose_drift(self) -> str:
+        """Check that the override changes only what it is meant to change.
+
+        The merged vLLM command, without the two added flags, must equal the
+        command in docker-compose.yml. The only other change allowed is the
+        added HF_HUB_OFFLINE setting.
+
+        Raises:
+            RunError: With a diff, if anything else differs.
+        """
+        self.override_sha256()
+        base = self.compose_model(with_override=False)
+        merged = self.compose_model(with_override=True)
+        base_vllm = base["services"]["vllm"]
+        merged_vllm = merged["services"]["vllm"]
+
+        stripped: list[str] = []
+        items = iter(merged_vllm["command"])
+        for item in items:
+            if item in REVISION_FLAGS:
+                next(items, None)
+            else:
+                stripped.append(item)
+        if stripped != base_vllm["command"]:
+            diff = "\n".join(difflib.unified_diff(
+                base_vllm["command"], stripped,
+                "docker-compose.yml", OVERRIDE_NAME, lineterm="", n=2))
+            raise RunError(
+                "the override's vLLM command differs from docker-compose.yml:\n"
+                + diff)
+
+        base_env = base_vllm.get("environment") or []
+        merged_env = merged_vllm.get("environment") or []
+        if sorted(merged_env) != sorted(set(base_env) | {OFFLINE_SETTING}):
+            raise RunError(
+                "the override changes the vLLM environment beyond "
+                f"{OFFLINE_SETTING}: {sorted(set(merged_env) ^ set(base_env))}")
+
+        for model in (base, merged):
+            for key in ("command", "environment"):
+                model["services"]["vllm"].pop(key, None)
+        if base != merged:
+            changed = sorted(
+                name for name in set(base["services"]) | set(merged["services"])
+                if base["services"].get(name) != merged["services"].get(name))
+            raise RunError(
+                "the override changes more than the vLLM command and "
+                f"environment (services: {changed or 'none; top-level keys'})")
+        return "base command and all other settings match docker-compose.yml"
+
+    def read_model_cache(
+        self, image: str, program: str, args: Sequence[str], path: str,
+        timeout: int = 60,
+    ) -> subprocess.CompletedProcess:
+        """Run a read-only program against a path in the model cache.
 
         Uses the running vllm container if there is one. Otherwise mounts the
         cache volume read-only in a short-lived container made from the vLLM
@@ -268,35 +403,91 @@ class StackInspector:
 
         Args:
             image: The configured vLLM image.
-            allow_helper: False forbids starting the helper container.
+            program: Program to run.
+            args: Its arguments, before the path.
+            path: Path relative to the cache root.
+            timeout: Seconds to wait.
 
         Returns:
-            The 40-character revision in refs/main.
+            The completed process.
 
         Raises:
-            RunError: If the revision cannot be read.
+            RunError: If the cache volume or the image is not there.
         """
         if self.running_vllm_image() is not None:
-            args = ("exec", "vllm", "cat",
-                    f"/root/.cache/huggingface/{QWEN_REFS_FILE}")
+            command = ["exec", "vllm", program, *args,
+                       f"{CONTAINER_CACHE}/{path}"]
         else:
             # Checked first: "docker run -v" would create a missing volume.
             if not self.volume_exists(HF_VOLUME):
-                raise RunError(f"Qwen cache missing: no volume {HF_VOLUME}")
-            if not allow_helper:
-                raise RunError("not read: a dry run starts no container")
+                raise RunError(f"model cache missing: no volume {HF_VOLUME}")
             if self.image_digest(image) is None:
-                raise RunError("Qwen cache not read: the vLLM image is not pulled")
-            args = ("run", "--rm", "--pull", "never", "--network", "none",
-                    "--entrypoint", "cat", "-v", f"{HF_VOLUME}:/hf:ro",
-                    image, f"/hf/{QWEN_REFS_FILE}")
-        result = self.shell.capture("docker", *args)
+                raise RunError("model cache not read: the vLLM image is not pulled")
+            command = ["run", "--rm", "--pull", "never", "--network", "none",
+                       "--entrypoint", program, "-v", f"{HF_VOLUME}:/hf:ro",
+                       image, *args, f"/hf/{path}"]
+        return self.shell.capture("docker", *command, timeout=timeout)
+
+    def model_snapshot(self) -> str:
+        """Check that the locked snapshot directory is in the cache volume."""
+        result = self.read_model_cache(
+            self.vllm_image(), "test", ["-d"], SNAPSHOT_DIR)
         if result.returncode != 0:
-            raise RunError(f"Qwen cache missing: {result.stderr.strip()}")
-        revision = result.stdout.strip()
-        if not re.fullmatch(r"[0-9a-f]{40}", revision):
-            raise RunError("Qwen refs/main does not hold a 40-character commit ID")
-        return revision
+            raise RunError(
+                f"snapshot {EXPECTED_MODEL_REVISION} missing from {HF_VOLUME} "
+                f"{result.stderr.strip()}".strip())
+        return f"snapshot {EXPECTED_MODEL_REVISION} present"
+
+    def model_weights(self) -> str:
+        """Hash the weights and compare them with the locked SHA-256."""
+        image = self.vllm_image()
+        started = time.monotonic()
+        result = self.read_model_cache(
+            image, "sha256sum", [], f"{SNAPSHOT_DIR}/{WEIGHTS_FILE}",
+            timeout=HASH_TIMEOUT_S)
+        elapsed = time.monotonic() - started
+        if result.returncode != 0:
+            raise RunError(f"cannot hash {WEIGHTS_FILE}: {result.stderr.strip()}")
+        found = (result.stdout.split() or [""])[0]
+        if found != EXPECTED_WEIGHTS_SHA256:
+            raise RunError(
+                f"{WEIGHTS_FILE} sha256 {found!r} != expected "
+                f"{EXPECTED_WEIGHTS_SHA256}")
+        return f"{WEIGHTS_FILE} sha256 matches (hashed in {elapsed:.1f} s)"
+
+    def running_stack(self) -> str:
+        """Check that a vllm container that is already running is locked.
+
+        run_experiment.sh reuses a stack that is up, so the override file
+        alone says nothing about that container.
+
+        Raises:
+            RunError: If it was not started with the current override.
+        """
+        if self.running_vllm_image() is None:
+            return "no vllm container running"
+        text = self.shell.output(
+            "docker", "inspect", "vllm", "--format", "{{json .Config}}")
+        config = json.loads(text)
+        command = config.get("Cmd") or []
+        problems = [
+            f"{flag} is not {EXPECTED_MODEL_REVISION}"
+            for flag in REVISION_FLAGS
+            if not any(command[i] == flag and command[i + 1] == EXPECTED_MODEL_REVISION
+                       for i in range(len(command) - 1))
+        ]
+        if OFFLINE_SETTING not in (config.get("Env") or []):
+            problems.append(f"{OFFLINE_SETTING} is not set")
+        if not problems:
+            state = self.stack_state()
+            if state.get("override_sha256") != self.override_sha256():
+                problems.append(
+                    "the override hash recorded at start differs from the file")
+        if problems:
+            raise RunError(
+                "the running vllm container is not locked: "
+                + "; ".join(problems) + ". Run --down, then start again")
+        return "running container is locked with the current override"
 
     def git_sha(self) -> str:
         """Return the full commit SHA of the checkout."""
@@ -401,20 +592,30 @@ class RunController:
                     f"vLLM image {image} is not pulled; this tool does not "
                     "start anything that would pull it")
             digest = "unavailable: image not pulled"
+        elif not digest.endswith("@" + EXPECTED_VLLM_DIGEST):
+            digest += f"  MISMATCH, expected {EXPECTED_VLLM_DIGEST}"
 
         try:
-            revision = self.inspector.qwen_revision(image, allow_helper=not dry_run)
-            if revision != EXPECTED_QWEN_REVISION:
-                revision += f"  MISMATCH, expected {EXPECTED_QWEN_REVISION}"
+            self.inspector.version_lock()
+            self.inspector.compose_drift()
+            lock = [
+                ("override", f"monitoring/{OVERRIDE_NAME}"),
+                ("override sha256", self.inspector.override_sha256()),
+                ("model revision", EXPECTED_MODEL_REVISION),
+                ("offline", OFFLINE_SETTING),
+            ]
         except RunError as exc:
             if not dry_run:
                 raise
-            revision = f"unavailable: {exc}"
+            lock = [("version lock", f"unavailable: {exc}")]
 
         plan = [
             ("vLLM image", image),
             ("vLLM digest", digest),
-            ("Qwen revision", revision),
+            *lock,
+            ("model files",
+             "not verified: a dry run starts no container" if dry_run
+             else "snapshot and weights verified by preflight"),
             ("git SHA", self.inspector.git_sha()),
             ("tree dirty", "yes" if self.inspector.git_dirty() else "no"),
             ("type", action),
@@ -429,6 +630,14 @@ class RunController:
             "note", "starting the stack pulls any other compose image that is "
                     "missing and builds nvml-exporter"))
         return plan
+
+    def locked_env(self) -> dict[str, str]:
+        """Environment that makes stack_up.sh load the local override.
+
+        run_experiment.sh passes it on when it calls stack_up.sh itself.
+        """
+        return {**os.environ,
+                OVERRIDE_ENV_VAR: str(self.inspector.override_path)}
 
     @staticmethod
     def show_plan(plan: Sequence[tuple[str, str]]) -> None:
@@ -475,6 +684,7 @@ class RunController:
             log.error("not confirmed; nothing started")
             return 1
         script = self.inspector.monitoring_dir / "run_experiment.sh"
+        env = self.locked_env()
         extra = () if use_mlflow else ("--no-mlflow",)
         for number in range(1, runs + 1):
             if number > 1:
@@ -482,7 +692,7 @@ class RunController:
             log.info("run %d of %d (%s)", number, runs, run_type)
             code = self.shell.stream(
                 "bash", str(script), run_type, *extra,
-                cwd=self.inspector.monitoring_dir)
+                cwd=self.inspector.monitoring_dir, env=env)
             if code != 0:
                 raise RunError(
                     f"run {number} of {runs} exited with code {code}; "
@@ -498,7 +708,8 @@ class RunController:
             return 1
         script = self.inspector.monitoring_dir / "stack_up.sh"
         code = self.shell.stream(
-            "bash", str(script), cwd=self.inspector.monitoring_dir)
+            "bash", str(script), cwd=self.inspector.monitoring_dir,
+            env=self.locked_env())
         if code != 0:
             raise RunError(f"stack_up.sh exited with code {code}")
         return 0
@@ -562,23 +773,24 @@ class RunController:
                 raise RunError(f"vLLM image not pulled: {image}")
             return digest
 
-        def cache() -> str:
-            return inspector.qwen_revision(inspector.vllm_image(), allow_helper=True)
-
-        def revision() -> str:
-            found = cache()
-            if found != EXPECTED_QWEN_REVISION:
+        def locked_digest() -> str:
+            digest = pulled()
+            if not digest.endswith("@" + EXPECTED_VLLM_DIGEST):
                 raise RunError(
-                    f"Qwen revision {found} != expected {EXPECTED_QWEN_REVISION}")
-            return found
+                    f"vLLM image digest {digest} != expected {EXPECTED_VLLM_DIGEST}")
+            return EXPECTED_VLLM_DIGEST
 
         check("git tree", clean_tree)
         check("GPU", inspector.gpu_name)
         check("vLLM variable", inspector.vllm_image)
         check("Grafana password", password)
         check("vLLM image", pulled)
-        check("Qwen cache", cache)
-        check("Qwen revision", revision)
+        check("vLLM digest", locked_digest)
+        check("version lock", inspector.version_lock)
+        check("compose drift", inspector.compose_drift)
+        check("model snapshot", inspector.model_snapshot)
+        check("model weights", inspector.model_weights)
+        check("running stack", inspector.running_stack)
         return results
 
     def preflight(self) -> int:

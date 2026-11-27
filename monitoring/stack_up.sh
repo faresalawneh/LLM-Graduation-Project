@@ -4,6 +4,8 @@ set -euo pipefail
 # Bring up the local INFERSCOPE stack (vLLM + monitoring) and instrument it.
 # Usage: ./stack_up.sh                  (dev: builds nvml-exporter locally)
 #        STACK_ENV=demo ./stack_up.sh   (demo: published images, see docker-compose.demo.yml)
+# INFERSCOPE_COMPOSE_OVERRIDE=<file> (dev only; set by scripts/start_run.py)
+# layers the local version lock on top of docker-compose.yml.
 # Then:  monitoring/scripts/run_local_replay.sh [steady|burst]
 
 MON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,6 +21,18 @@ case "${STACK_ENV}" in
   demo) COMPOSE+=(-f docker-compose.yml -f docker-compose.demo.yml) ;;
   *) echo "STACK_ENV must be dev or demo (got: ${STACK_ENV})" >&2; exit 1 ;;
 esac
+
+OVERRIDE="${INFERSCOPE_COMPOSE_OVERRIDE:-}"
+if [ -n "${OVERRIDE}" ]; then
+  [ "${STACK_ENV}" = "dev" ] \
+    || { echo "the local override is only supported with STACK_ENV=dev" >&2; exit 1; }
+  [ -f "${OVERRIDE}" ] || { echo "override not found: ${OVERRIDE}" >&2; exit 1; }
+  COMPOSE+=(-f docker-compose.yml -f "${OVERRIDE}")
+  echo "version lock: ${OVERRIDE}"
+else
+  echo "WARNING: no local override - the vLLM and model version is NOT locked." >&2
+  echo "WARNING: use monitoring/scripts/start_run.py to start a locked stack." >&2
+fi
 
 command -v docker >/dev/null \
   || { echo "docker unreachable - enable WSL integration in Docker Desktop" >&2; exit 1; }
@@ -74,19 +88,46 @@ done
 # Provenance for run_manifest / MLflow
 DIGEST="$(docker inspect "${IMG}" --format '{{index .RepoDigests 0}}' 2>/dev/null || echo "unknown")"
 BASELINE="$(docker inspect vllm --format '{{.RestartCount}}' 2>/dev/null || echo 0)"
-# Revision in the model cache volume, as the vllm container sees it.
-QWEN_REFS=/root/.cache/huggingface/hub/models--Qwen--Qwen2.5-1.5B-Instruct/refs/main
-QWEN_REVISION="$(docker exec vllm cat "${QWEN_REFS}" 2>/dev/null || true)"
-if ! [[ "${QWEN_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "WARN: Qwen revision unavailable (no valid refs/main in vllm)" >&2
-  QWEN_REVISION="unavailable"
+# What the running vllm container was actually started with.
+CMD_LINES="$(docker inspect vllm --format '{{range .Config.Cmd}}{{println .}}{{end}}' 2>/dev/null || true)"
+ENV_LINES="$(docker inspect vllm --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null || true)"
+revision_arg() {
+  local value
+  value="$(printf '%s\n' "${CMD_LINES}" | awk -v flag="$1" 'prev == flag { v = $0 } { prev = $0 } END { print v }')"
+  if [[ "${value}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "${value}"
+  else
+    echo "WARN: $1 unavailable (not set to a commit id on the vllm container)" >&2
+    echo "unavailable"
+  fi
+}
+MODEL_REVISION="$(revision_arg --revision)"
+TOKENIZER_REVISION="$(revision_arg --tokenizer-revision)"
+HF_OFFLINE="$(printf '%s\n' "${ENV_LINES}" | sed -n 's/^HF_HUB_OFFLINE=//p')"
+if [ -z "${HF_OFFLINE}" ]; then
+  echo "WARN: HF_HUB_OFFLINE unavailable on the vllm container" >&2
+  HF_OFFLINE="unavailable"
+fi
+if [ -n "${OVERRIDE}" ]; then
+  OVERRIDE_ACTIVE=true
+  OVERRIDE_PATH="$(realpath "${OVERRIDE}")"
+  OVERRIDE_SHA256="$(sha256sum "${OVERRIDE}" | cut -d' ' -f1)"
+else
+  OVERRIDE_ACTIVE=false
+  OVERRIDE_PATH="unavailable"
+  OVERRIDE_SHA256="unavailable"
 fi
 cat > "${LOG_DIR}/stack_state.json" <<EOF
 {
   "stack_env": "${STACK_ENV}",
   "vllm_image": "${IMG}",
   "vllm_digest": "${DIGEST}",
-  "qwen_revision": "${QWEN_REVISION}",
+  "override_active": "${OVERRIDE_ACTIVE}",
+  "override_path": "${OVERRIDE_PATH}",
+  "override_sha256": "${OVERRIDE_SHA256}",
+  "model_revision": "${MODEL_REVISION}",
+  "tokenizer_revision": "${TOKENIZER_REVISION}",
+  "hf_hub_offline": "${HF_OFFLINE}",
   "restart_count_at_start": ${BASELINE},
   "stack_up_time": "$(date -Iseconds)"
 }

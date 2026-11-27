@@ -1,4 +1,5 @@
 """Tests for start_run.py. No Docker, GPU or network: subprocess is mocked."""
+import hashlib
 import json
 import logging
 import subprocess
@@ -8,7 +9,13 @@ import pytest
 import start_run
 
 IMAGE = "vllm/vllm-openai:v0.9.2"
-DIGEST = "vllm/vllm-openai@sha256:" + "a" * 64
+DIGEST = "vllm/vllm-openai@" + start_run.EXPECTED_VLLM_DIGEST
+REV = start_run.EXPECTED_MODEL_REVISION
+BASE_COMMAND = ["--model", "Qwen/Qwen2.5-1.5B-Instruct", "--dtype", "float16"]
+LOCK_FLAGS = ["--revision", REV, "--tokenizer-revision", REV]
+BASE_ENV = ["NVIDIA_VISIBLE_DEVICES=all", "VLLM_USE_V1=0"]
+OVERRIDE_TEXT = b"services: {vllm: {}}\n"
+OVERRIDE_SHA = hashlib.sha256(OVERRIDE_TEXT).hexdigest()
 SHA = "b" * 40
 SECRET = "s3cr3t-grafana-value"
 
@@ -23,7 +30,17 @@ class FakeSystem:
         self.pulled = True
         self.running = None
         self.volumes = [start_run.HF_VOLUME]
-        self.revision = start_run.EXPECTED_QWEN_REVISION
+        self.digest = DIGEST
+        self.base_command = list(BASE_COMMAND)
+        self.merged_command = BASE_COMMAND + LOCK_FLAGS
+        self.merged_env = BASE_ENV + ["HF_HUB_OFFLINE=1"]
+        self.merged_extra = {}
+        self.snapshot = True
+        self.weights = start_run.EXPECTED_WEIGHTS_SHA256
+        self.container_config = {
+            "Cmd": BASE_COMMAND + LOCK_FLAGS,
+            "Env": BASE_ENV + ["HF_HUB_OFFLINE=1"],
+        }
         self.script_exit_codes = []
 
     def __call__(self, argv, **kwargs):
@@ -43,15 +60,30 @@ class FakeSystem:
                 code, err = 9, "no devices"
         elif tool == "docker" and args[:2] == ["image", "inspect"]:
             if self.pulled:
-                out = json.dumps([DIGEST])
+                out = json.dumps([self.digest])
             else:
                 code, err = 1, "Error: No such image: " + IMAGE
         elif tool == "docker" and args[0] == "ps":
             out = f"vllm|{self.running}\n" if self.running else ""
         elif tool == "docker" and args[:2] == ["volume", "ls"]:
             out = "\n".join(self.volumes)
+        elif tool == "docker" and args[0] == "compose" and "config" in args:
+            merged = any(a.endswith(start_run.OVERRIDE_NAME) for a in args)
+            vllm = {
+                "image": "${VLLM_IMAGE:-x}",
+                "command": self.merged_command if merged else self.base_command,
+                "environment": self.merged_env if merged else BASE_ENV,
+            }
+            if merged:
+                vllm.update(self.merged_extra)
+            out = json.dumps({"services": {"vllm": vllm, "grafana": {"image": "g"}}})
+        elif tool == "docker" and args[0] == "inspect":
+            out = json.dumps(self.container_config)
         elif tool == "docker" and args[0] in ("run", "exec"):
-            out = self.revision + "\n"
+            if "sha256sum" in args:
+                out = f"{self.weights}  {args[-1]}\n"
+            elif not self.snapshot:
+                code = 1
         elif tool == "bash" and self.script_exit_codes:
             code = self.script_exit_codes.pop(0)
         elif tool == "pkill":
@@ -63,7 +95,8 @@ class FakeSystem:
         return [
             (tool, args) for tool, args, _ in self.calls
             if tool in ("bash", "pkill")
-            or (tool == "docker" and args[0] in ("run", "exec", "compose", "pull"))
+            or (tool == "docker" and args[0] in ("run", "exec", "pull"))
+            or (tool == "docker" and args[0] == "compose" and "config" not in args)
         ]
 
 
@@ -73,7 +106,8 @@ def system(monkeypatch):
     monkeypatch.setattr(start_run.subprocess, "run", fake)
     monkeypatch.setattr(start_run.shutil, "which", lambda tool: f"/usr/bin/{tool}")
     monkeypatch.setattr(start_run.StackInspector, "api_answering", lambda self: False)
-    for name in ("VLLM_IMAGE", "STACK_ENV", "MAX_CONCURRENCY"):
+    for name in ("VLLM_IMAGE", "STACK_ENV", "MAX_CONCURRENCY",
+                 start_run.OVERRIDE_ENV_VAR):
         monkeypatch.delenv(name, raising=False)
     return fake
 
@@ -81,12 +115,17 @@ def system(monkeypatch):
 @pytest.fixture
 def repo(tmp_path):
     (tmp_path / "monitoring").mkdir()
+    (tmp_path / "monitoring" / start_run.OVERRIDE_NAME).write_bytes(OVERRIDE_TEXT)
     write_env(tmp_path, f"VLLM_IMAGE={IMAGE}\nGRAFANA_ADMIN_PASSWORD={SECRET}\n")
     return tmp_path
 
 
 def write_env(repo, text):
     (repo / "monitoring" / ".env").write_text(text)
+
+
+def remove_override(repo):
+    (repo / "monitoring" / start_run.OVERRIDE_NAME).unlink()
 
 
 def make_controller(repo, answer="yes"):
@@ -182,14 +221,20 @@ def test_failed_run_stops_the_rest(system, repo):
     assert len([c for c in system.calls if c[0] == "bash"]) == 2
 
 
+UNLOCKED = {"Cmd": BASE_COMMAND, "Env": BASE_ENV}
 BLOCKERS = {
     "git tree": ({"dirty": True}, None),
     "GPU": ({"gpu": False}, None),
     "vLLM variable": ({}, f"GRAFANA_ADMIN_PASSWORD={SECRET}\n"),
     "Grafana password": ({}, f"VLLM_IMAGE={IMAGE}\nGRAFANA_ADMIN_PASSWORD=\n"),
     "vLLM image": ({"pulled": False}, None),
-    "Qwen cache": ({"volumes": []}, None),
-    "Qwen revision": ({"revision": "c" * 40}, None),
+    "vLLM digest": ({"digest": "vllm/vllm-openai@sha256:" + "0" * 64}, None),
+    "version lock": ({"merged_command": BASE_COMMAND}, None),
+    "compose drift": (
+        {"base_command": BASE_COMMAND + ["--max-model-len", "2048"]}, None),
+    "model snapshot": ({"snapshot": False}, None),
+    "model weights": ({"weights": "0" * 64}, None),
+    "running stack": ({"running": IMAGE, "container_config": UNLOCKED}, None),
 }
 
 
@@ -247,21 +292,153 @@ def test_up_is_gated(system, repo):
     assert not [c for c in system.calls if c[0] == "bash"]
 
 
-def test_helper_container_never_pulls_and_mounts_read_only(system, repo):
+def docker_calls(system, verb):
+    return [a for t, a, _ in system.calls if t == "docker" and a[0] == verb]
+
+
+@pytest.mark.parametrize("check", ["model_snapshot", "model_weights"])
+def test_helper_containers_never_pull_and_mount_read_only(system, repo, check):
     controller, _ = make_controller(repo)
-    controller.inspector.qwen_revision(IMAGE, allow_helper=True)
-    args = [a for t, a, _ in system.calls if t == "docker" and a[0] == "run"][0]
+    getattr(controller.inspector, check)()
+    (args,) = docker_calls(system, "run")
     assert args[args.index("--pull") + 1] == "never"
     assert args[args.index("--network") + 1] == "none"
     assert f"{start_run.HF_VOLUME}:/hf:ro" in args
+    assert "--gpus" not in args
+    assert start_run.EXPECTED_MODEL_REVISION in args[-1]
 
 
-def test_helper_is_not_run_when_volume_is_missing(system, repo):
+@pytest.mark.parametrize("check", ["model_snapshot", "model_weights"])
+def test_helper_is_not_run_when_volume_is_missing(system, repo, check):
     system.volumes = []
     controller, _ = make_controller(repo)
     with pytest.raises(start_run.RunError, match="no volume"):
-        controller.inspector.qwen_revision(IMAGE, allow_helper=True)
+        getattr(controller.inspector, check)()
     assert system.started() == []
+
+
+def test_running_container_is_read_with_exec(system, repo):
+    system.running = IMAGE
+    controller, _ = make_controller(repo)
+    controller.inspector.model_weights()
+    assert docker_calls(system, "run") == []
+    (args,) = docker_calls(system, "exec")
+    assert args[-1].startswith("/root/.cache/huggingface/hub/")
+
+
+def test_weights_report_the_hash_time_and_use_a_long_timeout(system, repo):
+    controller, _ = make_controller(repo)
+    assert "hashed in " in controller.inspector.model_weights()
+    kwargs = [k for t, a, k in system.calls if t == "docker" and a[0] == "run"][0]
+    assert kwargs["timeout"] == start_run.HASH_TIMEOUT_S
+
+
+# --- version lock, drift, running stack --------------------------------------
+
+def test_missing_override_blocks_with_a_clear_message(system, repo, caplog):
+    remove_override(repo)
+    controller, prompts = make_controller(repo)
+    with pytest.raises(start_run.RunError, match="version lock, compose drift"):
+        controller.up()
+    assert "override missing" in caplog.text
+    assert prompts == []
+    assert system.started() == [("docker", a) for a in docker_calls(system, "run")]
+
+
+@pytest.mark.parametrize("change, message", [
+    ({"merged_command": BASE_COMMAND + LOCK_FLAGS[2:]}, "must set --revision"),
+    ({"merged_command": BASE_COMMAND + LOCK_FLAGS[:2]},
+     "must set --tokenizer-revision"),
+    ({"merged_command": BASE_COMMAND + ["--revision", "main"] + LOCK_FLAGS[2:]},
+     "must set --revision"),
+    ({"merged_command": BASE_COMMAND + LOCK_FLAGS + LOCK_FLAGS[:2]},
+     "exactly once"),
+    ({"merged_env": BASE_ENV}, "must set HF_HUB_OFFLINE=1"),
+    ({"merged_env": BASE_ENV + ["HF_HUB_OFFLINE=0"]}, "must set HF_HUB_OFFLINE=1"),
+])
+def test_version_lock_failures(system, repo, change, message):
+    for key, value in change.items():
+        setattr(system, key, value)
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError, match=message):
+        controller.inspector.version_lock()
+
+
+def test_drift_after_a_compose_change_shows_the_diff(system, repo):
+    # docker-compose.yml gains a flag that the copied command does not have.
+    system.base_command = BASE_COMMAND + ["--enforce-eager"]
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError) as exc:
+        controller.inspector.compose_drift()
+    assert "differs from docker-compose.yml" in str(exc.value)
+    assert "+++ docker-compose.local.yml" in str(exc.value)
+    assert "\n---enforce-eager" in str(exc.value)
+
+
+@pytest.mark.parametrize("change, message", [
+    ({"base_command": BASE_COMMAND[:-1] + ["bfloat16"]}, "command differs"),
+    ({"merged_command": BASE_COMMAND[:2] + LOCK_FLAGS}, "command differs"),
+    ({"merged_env": BASE_ENV + ["HF_HUB_OFFLINE=1", "X=1"]}, "environment"),
+    ({"merged_env": ["HF_HUB_OFFLINE=1"]}, "environment"),
+    ({"merged_extra": {"image": "other:1"}}, "changes more than"),
+])
+def test_drift_failures(system, repo, change, message):
+    for key, value in change.items():
+        setattr(system, key, value)
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError, match=message):
+        controller.inspector.compose_drift()
+
+
+def test_compose_is_only_read_without_interpolation(system, repo, caplog):
+    controller, _ = make_controller(repo)
+    controller.inspector.compose_drift()
+    controller.inspector.version_lock()
+    for args in docker_calls(system, "compose"):
+        assert "config" in args and "--no-interpolate" in args
+
+
+def locked_state(sha=OVERRIDE_SHA):
+    return {"override_sha256": sha}
+
+
+def test_locked_running_container_passes(system, repo, monkeypatch):
+    system.running = IMAGE
+    monkeypatch.setattr(start_run.StackInspector, "stack_state",
+                        lambda self: locked_state())
+    controller, _ = make_controller(repo)
+    assert "locked with the current override" in controller.inspector.running_stack()
+
+
+@pytest.mark.parametrize("config, state, message", [
+    ({"Cmd": BASE_COMMAND + LOCK_FLAGS[2:], "Env": ["HF_HUB_OFFLINE=1"]},
+     locked_state(), "--revision is not"),
+    ({"Cmd": BASE_COMMAND + LOCK_FLAGS[:2], "Env": ["HF_HUB_OFFLINE=1"]},
+     locked_state(), "--tokenizer-revision is not"),
+    ({"Cmd": BASE_COMMAND + LOCK_FLAGS, "Env": BASE_ENV},
+     locked_state(), "HF_HUB_OFFLINE=1 is not set"),
+    ({"Cmd": BASE_COMMAND + LOCK_FLAGS, "Env": ["HF_HUB_OFFLINE=1"]},
+     locked_state("0" * 64), "override hash recorded at start differs"),
+    ({"Cmd": BASE_COMMAND + LOCK_FLAGS, "Env": ["HF_HUB_OFFLINE=1"]},
+     {}, "override hash recorded at start differs"),
+])
+def test_unlocked_running_container_is_blocked(
+        system, repo, monkeypatch, config, state, message):
+    system.running = IMAGE
+    system.container_config = config
+    monkeypatch.setattr(start_run.StackInspector, "stack_state", lambda self: state)
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError, match=message):
+        controller.inspector.running_stack()
+
+
+@pytest.mark.parametrize("action", ["up", "steady"])
+def test_starts_always_pass_the_override(system, repo, action):
+    controller, _ = make_controller(repo)
+    controller.up() if action == "up" else controller.run(action, 2, True, False)
+    envs = [k["env"] for t, _, k in system.calls if t == "bash"]
+    expected = str(repo / "monitoring" / start_run.OVERRIDE_NAME)
+    assert envs and all(e[start_run.OVERRIDE_ENV_VAR] == expected for e in envs)
 
 
 # --- dry run -----------------------------------------------------------------
@@ -275,7 +452,17 @@ def test_dry_run_starts_nothing_and_asks_nothing(system, repo, pulled, caplog):
     assert prompts == []
     assert system.started() == []
     assert "inferscope-gp2" in caplog.text
+    assert REV in caplog.text and OVERRIDE_SHA in caplog.text
+    assert "not verified: a dry run starts no container" in caplog.text
     assert "nothing started" in caplog.text
+
+
+def test_dry_run_reports_a_missing_override(system, repo, caplog):
+    caplog.set_level(logging.INFO)
+    remove_override(repo)
+    controller, _ = make_controller(repo)
+    assert controller.run("smoke", 1, True, True) == 0
+    assert "unavailable: override missing" in caplog.text
 
 
 def test_dry_run_shows_mlflow_disabled(system, repo, caplog):
@@ -320,8 +507,11 @@ def test_preflight_passes(system, repo, caplog):
 @pytest.mark.parametrize("change, message", [
     ({"dirty": True}, "working tree is dirty"),
     ({"gpu": False}, "no devices"),
-    ({"volumes": []}, "Qwen cache missing"),
-    ({"revision": "c" * 40}, "!= expected"),
+    ({"volumes": []}, "model cache missing"),
+    ({"snapshot": False}, "snapshot " + REV + " missing"),
+    ({"weights": "c" * 64}, "!= expected"),
+    ({"digest": "vllm/vllm-openai@sha256:" + "c" * 64}, "vLLM image digest"),
+    ({"merged_env": BASE_ENV}, "must set HF_HUB_OFFLINE=1"),
     ({"pulled": False}, "vLLM image not pulled"),
 ])
 def test_preflight_failure_messages(system, repo, caplog, change, message):

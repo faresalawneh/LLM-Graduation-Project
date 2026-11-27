@@ -45,6 +45,11 @@ PROVENANCE_KEYS = (
     "max_concurrency", "git_dirty",
     "trace_original_path", "trace_original_sha256",
 )
+# Written to stack_state.json by stack_up.sh about the vllm container it started.
+VERSION_LOCK_KEYS = (
+    "override_active", "override_sha256", "model_revision",
+    "tokenizer_revision", "hf_hub_offline",
+)
 
 
 
@@ -123,7 +128,10 @@ def run_provenance(
         Every param, with "unavailable" for any value that was not recorded.
     """
     record = read_trace_provenance(manifest)
-    found = {"qwen_revision": stack.get("qwen_revision")}
+    found = {key: stack.get(key) for key in VERSION_LOCK_KEYS}
+    digest = stack.get("vllm_digest")
+    # stack_up.sh writes "unknown" when docker cannot report a digest.
+    found["vllm_image_digest"] = None if digest == "unknown" else digest
     found.update({key: record.get(key) for key in PROVENANCE_KEYS})
     params: dict[str, str] = {}
     for key, value in found.items():
