@@ -8,6 +8,8 @@
 # Version note: mlflow 3.14 downgrades pyarrow and protobuf. The pins below
 # are the combination verified against a 9,483-request burst run on
 # 2026-07-30 (aiperf 0.11.0, Python 3.12). Do not float them casually.
+# requirements.txt carries the same pyarrow/protobuf pins, so the two files
+# install together in one environment (pip -r requirements.txt -r this file).
 
 mlflow==3.14.0
 pyarrow==24.0.0
