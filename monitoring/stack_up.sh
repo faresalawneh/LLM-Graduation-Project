@@ -30,7 +30,23 @@ case "${IMG}" in
 esac
 echo "vllm image: ${IMG}"
 
-echo "starting stack (env: ${STACK_ENV}, profile: local)..."
+# Guard: dev and demo are separate compose projects (own volumes and network)
+# but share fixed container names. If the other environment's containers still
+# exist, stop here instead of failing halfway through "up" on a name conflict.
+PROJECT="$("${COMPOSE[@]}" config 2>/dev/null | sed -n 's/^name: //p' | head -n1 || true)"
+if [ -n "${PROJECT}" ]; then
+  for c in prometheus otel-collector nvml-exporter grafana vllm; do
+    OWNER="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "${c}" 2>/dev/null || true)"
+    if [ -n "${OWNER}" ] && [ "${OWNER}" != "${PROJECT}" ]; then
+      echo "container '${c}' belongs to compose project '${OWNER}', not '${PROJECT}' (env: ${STACK_ENV})." >&2
+      echo "Bring the other environment down first (volumes are kept):" >&2
+      echo "  docker compose -p ${OWNER} down" >&2
+      exit 1
+    fi
+  done
+fi
+
+echo "starting stack (env: ${STACK_ENV}, project: ${PROJECT:-unknown}, profile: local)..."
 "${COMPOSE[@]}" --profile local up -d
 
 # Crash instrumentation: vLLM has restart:unless-stopped, so a die/restart is

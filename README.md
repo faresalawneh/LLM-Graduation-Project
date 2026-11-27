@@ -125,7 +125,7 @@ Laptop GPU (8 GB, Blackwell, sm_120) under WSL2 with Docker Desktop.
 | Driver | NVIDIA driver with WSL2 GPU support; the container runtime bind-mounts `libnvidia-ml.so` into the exporter |
 | Container runtime | Docker with the NVIDIA container runtime (`driver: nvidia` device reservations are used by the vllm and nvml-exporter services) |
 | Python | 3.12 (CI runs 3.12; `requirements-experiments.txt` pins are verified on 3.12). `api/Dockerfile` and `Dockerfile.nvml` both build on 3.12 |
-| Disk | Hugging Face model cache lives in the `hf_cache` Docker volume; a burst run's artifact directory plus its MLflow copy is on the order of a few hundred MB. `burst_window.csv` is 392 KB over Git LFS |
+| Disk | Hugging Face model cache lives in the `hf_cache` Docker volume (`monitoring_hf_cache` for dev, `inferscope-demo_hf_cache` for the demo, so the demo downloads the model once on its first start); a burst run's artifact directory plus its MLflow copy is on the order of a few hundred MB. `burst_window.csv` is 392 KB over Git LFS |
 | RAM | Not pinned anywhere in the repo |
 
 DCGM vs NVML: NVIDIA's DCGM Exporter cannot run under WSL2, because the GPU is
@@ -250,7 +250,8 @@ curl -s http://localhost:5000/health
 `api/docker-compose.yml` joins the monitoring compose network
 (`monitoring_monitoring`, the name compose gives it when the stack is started
 from `monitoring/`) and sets `PROMETHEUS_URL=http://prometheus:9090`. If you
-started the stack under a different project name, set `MONITORING_NETWORK`.
+started the stack under a different project name, set `MONITORING_NETWORK`
+(the demo stack uses `inferscope-demo_monitoring`).
 It pulls the image CI publishes from `main`,
 `mahmoudalwaqfi/llm-observability-api:latest` (override the account with
 `DOCKERHUB_NAMESPACE` and the tag with `API_IMAGE_TAG`).
@@ -380,12 +381,27 @@ version that is assessed. Both run on the WSL2 laptop with the `local` profile.
 | Code | `main` or a feature branch | The `gp2-demo` git tag |
 | `nvml-exporter` | Built locally from `monitoring/exporters/Dockerfile.nvml` | Pulled from Docker Hub: `<DOCKERHUB_NAMESPACE>/llm-observability-nvml-exporter:<DEMO_IMAGE_TAG>` |
 | Third-party images | Pinned in `monitoring/.env` | Same pins, from the tagged `.env.example` |
-| API (`api/docker-compose.yml`) | `<DOCKERHUB_NAMESPACE>/llm-observability-api:latest` | Same image at `API_IMAGE_TAG=<gp2-demo SHA>` |
+| API (`api/docker-compose.yml`) | `<DOCKERHUB_NAMESPACE>/llm-observability-api:latest` | Same image at `API_IMAGE_TAG=<gp2-demo SHA>`, with `MONITORING_NETWORK=inferscope-demo_monitoring` |
 | Compose files | `docker-compose.yml` | `docker-compose.yml` + `docker-compose.demo.yml` |
+| Compose project | `monitoring` (the directory name) | `inferscope-demo` (set in `docker-compose.demo.yml`) |
+| Volumes and network | `monitoring_prometheus_data`, `monitoring_grafana_data`, `monitoring_hf_cache`, `monitoring_monitoring` | `inferscope-demo_prometheus_data`, `inferscope-demo_grafana_data`, `inferscope-demo_hf_cache`, `inferscope-demo_monitoring` |
+| MLflow experiment | `inferscope-gp2` | `inferscope-gp2-demo` |
 | Start | `./stack_up.sh` | `STACK_ENV=demo ./stack_up.sh` |
 
 `stack_up.sh` records which environment it started (`stack_env`) in
-`monitoring/logs/stack_state.json`.
+`monitoring/logs/stack_state.json`. `mlflow_log_run.py` reads it, tags every
+run with `stack_env`, and logs demo runs to their own experiment, so assessed
+runs and their Prometheus/Grafana data never mix with dev data.
+
+Dev and demo cannot run at the same time: the container names (`vllm`,
+`prometheus`, `grafana`, ...) are fixed. `stack_up.sh` stops with a message if
+the other environment's containers still exist. Bring that environment down
+first; its volumes are kept:
+
+```bash
+docker compose -p monitoring down        # before starting the demo
+docker compose -p inferscope-demo down   # before going back to dev
+```
 
 ### Published images (Docker Hub)
 
@@ -458,14 +474,17 @@ cp monitoring/.env.example monitoring/.env
 git rev-parse gp2-demo
 
 cd monitoring
+docker compose -p monitoring down   # only if a dev stack exists on this machine
 STACK_ENV=demo ./stack_up.sh
 ```
 
-Then start the API at the same commit:
+Then start the API at the same commit, on the demo network:
 
 ```bash
 cd ..
-API_IMAGE_TAG=$(git rev-parse gp2-demo) docker compose -f api/docker-compose.yml up -d
+MONITORING_NETWORK=inferscope-demo_monitoring \
+API_IMAGE_TAG=$(git rev-parse gp2-demo) \
+docker compose -f api/docker-compose.yml up -d
 ```
 
 Without `stack_up.sh`, the equivalent monitoring compose command is:
