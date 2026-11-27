@@ -4,8 +4,9 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# The exporter imports only pynvml and prometheus_client, so install just those
+# (same pins as the root requirements.txt, which CI uses to run its tests).
+RUN pip install --no-cache-dir nvidia-ml-py==12.575.51 prometheus_client==0.23.1
 COPY monitoring/exporters/nvml_exporter.py .
 
 EXPOSE 9400
