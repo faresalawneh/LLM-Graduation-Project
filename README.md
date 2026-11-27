@@ -307,6 +307,33 @@ Metric values are `null` when Prometheus is not reachable; the tests check
 status codes, field names and roles, not values. Change `baseUrl` in the
 environment to test a remote deployment.
 
+## Manual runs
+
+`monitoring/scripts/start_run.py` is a gated front end for the dev environment.
+Run it from the repository root. It needs `monitoring/.env` with `VLLM_IMAGE`
+and `GRAFANA_ADMIN_PASSWORD`.
+
+```bash
+python3 monitoring/scripts/start_run.py --preflight                     # readiness checks
+python3 monitoring/scripts/start_run.py --type smoke --dry-run          # print the plan only
+python3 monitoring/scripts/start_run.py --type smoke                    # also: steady, burst
+python3 monitoring/scripts/start_run.py --type steady --runs 3          # repeat a workload
+python3 monitoring/scripts/start_run.py --type burst --no-mlflow        # skip MLflow logging
+python3 monitoring/scripts/start_run.py --up                            # start the stack
+python3 monitoring/scripts/start_run.py --down                          # stop it; volumes are kept
+python3 monitoring/scripts/start_run.py --mlflow-ui                     # http://localhost:5001
+```
+
+`--type` and `--up` print a plan and continue only if you type exactly `yes`.
+There is no bypass flag. `--type` calls `run_experiment.sh`, so a run starts the
+stack if it is not already up. Starting the stack pulls any other missing
+compose image and builds `nvml-exporter`.
+
+`--preflight` does not run automatically before a run. It may start a
+short-lived container from the already pulled vLLM image, with no GPU and no
+network, to read the model cache. A zero exit code from a run does not rule out
+a vLLM restart: check the crash check output.
+
 ## Repo layout
 
 | Path | Purpose |

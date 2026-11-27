@@ -23,7 +23,7 @@ export PROMETHEUS_URL="http://localhost:9090"
 export ARTIFACT_ROOT="${ARTIFACT_ROOT:-${REPO_ROOT}/artifacts}"
 export ENABLE_GPU_SCRAPE=1
 export SLICE_DURATION=5
-export MAX_CONCURRENCY=20          # frozen for comparability with prior runs
+export MAX_CONCURRENCY="${MAX_CONCURRENCY:-20}"   # default frozen at 20 for comparability; override per-run
 export SCENARIO
 
 case "$SCENARIO" in
