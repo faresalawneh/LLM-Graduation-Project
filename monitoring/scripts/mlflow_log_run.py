@@ -44,6 +44,7 @@ TRACE_PROVENANCE_FILE = "trace_provenance.json"
 PROVENANCE_KEYS = (
     "max_concurrency", "git_dirty",
     "trace_original_path", "trace_original_sha256",
+    "client_hf_hub_offline", "client_tokenizer_revision",
 )
 # Written to stack_state.json by stack_up.sh about the vllm container it started.
 VERSION_LOCK_KEYS = (
@@ -133,6 +134,12 @@ def run_provenance(
     # stack_up.sh writes "unknown" when docker cannot report a digest.
     found["vllm_image_digest"] = None if digest == "unknown" else digest
     found.update({key: record.get(key) for key in PROVENANCE_KEYS})
+    # The record holds what the replay was given; the manifest holds what the
+    # replay passed to AIPerf. Report a revision only if the two agree.
+    given = found["client_tokenizer_revision"]
+    if given not in (None, UNAVAILABLE) and manifest.get("tokenizer_revision") != given:
+        log.warning("client tokenizer revision: record and run manifest differ")
+        found["client_tokenizer_revision"] = None
     params: dict[str, str] = {}
     for key, value in found.items():
         if value in (None, "", UNAVAILABLE):

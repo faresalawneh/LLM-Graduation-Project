@@ -18,7 +18,9 @@ LOCK_STATE = {
     "hf_hub_offline": "1",
 }
 RUN_KEYS = ("max_concurrency", "git_dirty",
-            "trace_original_path", "trace_original_sha256")
+            "trace_original_path", "trace_original_sha256",
+            "client_hf_hub_offline", "client_tokenizer_revision")
+CLIENT_REV = "9" * 40
 DIGEST = "vllm/vllm-openai@sha256:" + "f" * 64
 STATE = {**LOCK_STATE, "vllm_digest": DIGEST}
 NEW_PARAMS = (*LOCK_STATE, "vllm_image_digest", *RUN_KEYS)
@@ -42,10 +44,12 @@ def write_record(directory, trace_used=None, **changes):
         "trace_original_sha256": "d" * 64,
         "max_concurrency": "7",
         "git_dirty": "false",
+        "client_hf_hub_offline": "1",
+        "client_tokenizer_revision": CLIENT_REV,
     }
     record.update(changes)
     (directory / "trace_provenance.json").write_text(json.dumps(record))
-    return {"trace_file": str(trace)}, record
+    return {"trace_file": str(trace), "tokenizer_revision": CLIENT_REV}, record
 
 
 def test_all_values_are_reported(logger_module, tmp_path):
@@ -80,6 +84,21 @@ def test_missing_values_are_unavailable_with_a_warning(
     for key in NEW_PARAMS:
         assert f"{key} unavailable" in caplog.text
     assert any(r.levelno == logging.WARNING for r in caplog.records)
+
+
+@pytest.mark.parametrize("passed", ["", "main", None])
+def test_client_revision_needs_the_manifest_to_agree(
+        logger_module, tmp_path, passed, caplog):
+    module, _ = logger_module
+    manifest, _ = write_record(tmp_path)
+    if passed is None:
+        del manifest["tokenizer_revision"]
+    else:
+        manifest["tokenizer_revision"] = passed
+    params = module.run_provenance(manifest, STATE)
+    assert params["client_tokenizer_revision"] == "unavailable"
+    assert params["client_hf_hub_offline"] == "1"
+    assert "record and run manifest differ" in caplog.text
 
 
 def test_a_record_for_another_trace_is_ignored(logger_module, tmp_path, caplog):
@@ -122,6 +141,8 @@ def test_main_logs_the_new_params(logger_module, tmp_path, monkeypatch):
         assert logged[key] == value
     assert logged["vllm_image_digest"] == DIGEST
     assert logged["max_concurrency"] == "7"
+    assert logged["client_hf_hub_offline"] == "1"
+    assert logged["client_tokenizer_revision"] == CLIENT_REV
     assert logged["git_dirty"] == "false"
     assert logged["trace_original_sha256"] == "d" * 64
     assert logged["trace_original_path"].endswith("burst_window.csv")

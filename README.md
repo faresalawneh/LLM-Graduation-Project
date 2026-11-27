@@ -330,6 +330,9 @@ untracked `monitoring/docker-compose.local.yml` on the compose file. It fixes th
 model and tokenizer commit and sets `HF_HUB_OFFLINE=1`. This is the only
 supported way to start the stack: `stack_up.sh` on its own warns that the version
 is not locked. The file is not in git, so a machine without it fails preflight.
+The client tokenizer is locked too: runs give AIPerf `HF_HUB_OFFLINE=1` and
+`--tokenizer-revision`, preflight matches the host tokenizer files against the
+model volume, and MLflow records both client values.
 
 `--type` and `--up` first require every preflight check to pass: clean git tree,
 GPU, `VLLM_IMAGE`, Grafana password, vLLM image pulled and at the locked digest,

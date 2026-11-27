@@ -44,6 +44,7 @@ SCENARIO        = os.getenv("SCENARIO", "steady")   # "steady" | "burst"
 ARTIFACT_ROOT   = Path(os.getenv("ARTIFACT_ROOT", "aiperf_results"))
 ENDPOINT_TYPE   = os.getenv("ENDPOINT_TYPE", "completions")
 TOKENIZER       = os.getenv("TOKENIZER", "")   # optional local tokenizer path/id
+TOKENIZER_REVISION = os.getenv("TOKENIZER_REVISION", "")   # optional Hub commit id
 SLICE_DURATION  = os.getenv("SLICE_DURATION", "5")
 
 # Live metrics endpoint. IMPORTANT: aiperf 0.11 does NOT auto-append the OTLP
@@ -97,6 +98,8 @@ def build_aiperf_command(artifact_dir: Path) -> List[str]:
     ]
     if TOKENIZER:
         command += ["--tokenizer", TOKENIZER]
+    if TOKENIZER_REVISION:
+        command += ["--tokenizer-revision", TOKENIZER_REVISION]
     if OTEL_URL:
         command += [
             "--otel-url", OTEL_URL,
@@ -161,6 +164,7 @@ def write_run_manifest(artifact_dir: Path, scenario: str) -> None:
         "artifact_dir": str(artifact_dir),
         "slice_duration": SLICE_DURATION,
         "tokenizer": TOKENIZER,
+        "tokenizer_revision": TOKENIZER_REVISION,
         "enable_gpu_scrape": ENABLE_GPU_SCRAPE,
         "otel_url": OTEL_URL,
     }

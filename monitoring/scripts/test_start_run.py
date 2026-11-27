@@ -15,6 +15,7 @@ BASE_COMMAND = ["--model", "Qwen/Qwen2.5-1.5B-Instruct", "--dtype", "float16"]
 LOCK_FLAGS = ["--revision", REV, "--tokenizer-revision", REV]
 BASE_ENV = ["NVIDIA_VISIBLE_DEVICES=all", "VLLM_USE_V1=0"]
 OVERRIDE_TEXT = b"services: {vllm: {}}\n"
+HOST_TOKENIZER = {name: name.encode() for name in start_run.TOKENIZER_FILES}
 OVERRIDE_SHA = hashlib.sha256(OVERRIDE_TEXT).hexdigest()
 SHA = "b" * 40
 SECRET = "s3cr3t-grafana-value"
@@ -37,6 +38,7 @@ class FakeSystem:
         self.merged_extra = {}
         self.snapshot = True
         self.weights = start_run.EXPECTED_WEIGHTS_SHA256
+        self.volume_files = dict(HOST_TOKENIZER)
         self.container_config = {
             "Cmd": BASE_COMMAND + LOCK_FLAGS,
             "Env": BASE_ENV + ["HF_HUB_OFFLINE=1"],
@@ -81,7 +83,15 @@ class FakeSystem:
             out = json.dumps(self.container_config)
         elif tool == "docker" and args[0] in ("run", "exec"):
             if "sha256sum" in args:
-                out = f"{self.weights}  {args[-1]}\n"
+                name = args[-1].rsplit("/", 1)[-1]
+                if name in start_run.TOKENIZER_FILES:
+                    if name in self.volume_files:
+                        digest = hashlib.sha256(self.volume_files[name]).hexdigest()
+                        out = f"{digest}  {args[-1]}\n"
+                    else:
+                        code, err = 1, "No such file"
+                else:
+                    out = f"{self.weights}  {args[-1]}\n"
             elif not self.snapshot:
                 code = 1
         elif tool == "bash" and self.script_exit_codes:
@@ -106,14 +116,25 @@ def system(monkeypatch):
     monkeypatch.setattr(start_run.subprocess, "run", fake)
     monkeypatch.setattr(start_run.shutil, "which", lambda tool: f"/usr/bin/{tool}")
     monkeypatch.setattr(start_run.StackInspector, "api_answering", lambda self: False)
-    for name in ("VLLM_IMAGE", "STACK_ENV", "MAX_CONCURRENCY",
+    for name in ("VLLM_IMAGE", "STACK_ENV", "MAX_CONCURRENCY", "HF_HUB_OFFLINE",
+                 "TOKENIZER_REVISION", *start_run.CLIENT_CONFLICT_VARS,
                  start_run.OVERRIDE_ENV_VAR):
         monkeypatch.delenv(name, raising=False)
     return fake
 
 
+def host_snapshot(repo):
+    return repo / "hostcache" / "snapshots" / REV
+
+
 @pytest.fixture
-def repo(tmp_path):
+def repo(tmp_path, monkeypatch):
+    monkeypatch.setattr(start_run, "HOST_MODEL_CACHE", tmp_path / "hostcache")
+    host_snapshot(tmp_path).mkdir(parents=True)
+    for name, content in HOST_TOKENIZER.items():
+        (host_snapshot(tmp_path) / name).write_bytes(content)
+    (tmp_path / "hostcache" / "refs").mkdir()
+    (tmp_path / "hostcache" / "refs" / "main").write_text(REV)
     (tmp_path / "monitoring").mkdir()
     (tmp_path / "monitoring" / start_run.OVERRIDE_NAME).write_bytes(OVERRIDE_TEXT)
     write_env(tmp_path, f"VLLM_IMAGE={IMAGE}\nGRAFANA_ADMIN_PASSWORD={SECRET}\n")
@@ -234,6 +255,8 @@ BLOCKERS = {
         {"base_command": BASE_COMMAND + ["--max-model-len", "2048"]}, None),
     "model snapshot": ({"snapshot": False}, None),
     "model weights": ({"weights": "0" * 64}, None),
+    "client tokenizer": (
+        {"volume_files": {**HOST_TOKENIZER, "vocab.json": b"other"}}, None),
     "running stack": ({"running": IMAGE, "container_config": UNLOCKED}, None),
 }
 
@@ -432,6 +455,84 @@ def test_unlocked_running_container_is_blocked(
         controller.inspector.running_stack()
 
 
+# --- client tokenizer --------------------------------------------------------
+
+def test_client_tokenizer_match(system, repo):
+    controller, _ = make_controller(repo)
+    assert "4 tokenizer files match" in controller.inspector.client_tokenizer()
+    hashed = [a[-1].rsplit("/", 1)[-1] for a in docker_calls(system, "run")]
+    assert hashed == list(start_run.TOKENIZER_FILES)
+
+
+@pytest.mark.parametrize("name", start_run.TOKENIZER_FILES)
+def test_client_tokenizer_mismatch(system, repo, name):
+    (host_snapshot(repo) / name).write_bytes(b"changed on the host")
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError, match=name + " differs"):
+        controller.inspector.client_tokenizer()
+
+
+def test_client_tokenizer_missing_refs_main(system, repo):
+    (repo / "hostcache" / "refs" / "main").unlink()
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError, match="refs/main is missing"):
+        controller.inspector.client_tokenizer()
+
+
+def test_client_tokenizer_wrong_refs_main(system, repo):
+    (repo / "hostcache" / "refs" / "main").write_text("c" * 40)
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError, match="refs/main is " + "c" * 40):
+        controller.inspector.client_tokenizer()
+
+
+@pytest.mark.parametrize("name", start_run.TOKENIZER_FILES)
+def test_client_tokenizer_missing_file(system, repo, name):
+    (host_snapshot(repo) / name).unlink()
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError, match="host file missing: " + name):
+        controller.inspector.client_tokenizer()
+
+
+def test_client_tokenizer_file_missing_in_volume(system, repo):
+    del system.volume_files["merges.txt"]
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError, match="volume file unreadable: merges"):
+        controller.inspector.client_tokenizer()
+
+
+def test_client_tokenizer_reports_every_problem(system, repo):
+    (repo / "hostcache" / "refs" / "main").unlink()
+    (host_snapshot(repo) / "vocab.json").unlink()
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError) as exc:
+        controller.inspector.client_tokenizer()
+    assert "refs/main" in str(exc.value) and "vocab.json" in str(exc.value)
+
+
+@pytest.mark.parametrize("name", start_run.CLIENT_CONFLICT_VARS)
+def test_client_tokenizer_rejects_overriding_variables(
+        system, repo, monkeypatch, name):
+    monkeypatch.setenv(name, "/somewhere/else")
+    controller, _ = make_controller(repo)
+    with pytest.raises(start_run.RunError, match="unset " + name):
+        controller.inspector.client_tokenizer()
+
+
+@pytest.mark.parametrize("action", ["smoke", "steady", "burst"])
+def test_every_run_forces_the_client_lock(system, repo, monkeypatch, action):
+    # A shell that says otherwise is overruled.
+    monkeypatch.setenv("HF_HUB_OFFLINE", "0")
+    monkeypatch.setenv("TOKENIZER_REVISION", "main")
+    controller, _ = make_controller(repo)
+    controller.run(action, 2, True, False)
+    envs = [k["env"] for t, _, k in system.calls if t == "bash"]
+    assert len(envs) == 2
+    for env in envs:
+        assert env["HF_HUB_OFFLINE"] == "1"
+        assert env["TOKENIZER_REVISION"] == REV
+
+
 @pytest.mark.parametrize("action", ["up", "steady"])
 def test_starts_always_pass_the_override(system, repo, action):
     controller, _ = make_controller(repo)
@@ -454,6 +555,7 @@ def test_dry_run_starts_nothing_and_asks_nothing(system, repo, pulled, caplog):
     assert "inferscope-gp2" in caplog.text
     assert REV in caplog.text and OVERRIDE_SHA in caplog.text
     assert "not verified: a dry run starts no container" in caplog.text
+    assert "client tokenizer" in caplog.text
     assert "nothing started" in caplog.text
 
 

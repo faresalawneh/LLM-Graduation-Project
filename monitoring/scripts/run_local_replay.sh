@@ -76,10 +76,12 @@ else
   GIT_DIRTY=unavailable
 fi
 python3 - "${TRACE_DIR}/trace_provenance.json" "$TRACE_FILE" "$TRACE_ORIGINAL" \
-  "$TRACE_SHA256" "$MAX_CONCURRENCY" "$GIT_DIRTY" <<'PYEOF'
+  "$TRACE_SHA256" "$MAX_CONCURRENCY" "$GIT_DIRTY" \
+  "${HF_HUB_OFFLINE:-unavailable}" "${TOKENIZER_REVISION:-unavailable}" <<'PYEOF'
 import json, sys
 keys = ("trace_used", "trace_original_path", "trace_original_sha256",
-        "max_concurrency", "git_dirty")
+        "max_concurrency", "git_dirty",
+        "client_hf_hub_offline", "client_tokenizer_revision")
 with open(sys.argv[1], "w") as fh:
     json.dump(dict(zip(keys, sys.argv[2:])), fh, indent=2)
 PYEOF

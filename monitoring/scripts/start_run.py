@@ -45,6 +45,14 @@ WEIGHTS_FILE = "model.safetensors"
 CONTAINER_CACHE = "/root/.cache/huggingface"
 REVISION_FLAGS = ("--revision", "--tokenizer-revision")
 OFFLINE_SETTING = "HF_HUB_OFFLINE=1"
+# AIPerf loads its tokenizer on the host, from the default Hugging Face cache.
+HOST_MODEL_CACHE = (
+    Path.home() / ".cache/huggingface/hub/models--Qwen--Qwen2.5-1.5B-Instruct")
+TOKENIZER_FILES = (
+    "tokenizer.json", "tokenizer_config.json", "vocab.json", "merges.txt")
+# Any of these would make AIPerf load something other than what is checked.
+CLIENT_CONFLICT_VARS = (
+    "TOKENIZER", "HF_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE")
 OVERRIDE_NAME = "docker-compose.local.yml"
 # stack_up.sh layers the override only when this variable names it.
 OVERRIDE_ENV_VAR = "INFERSCOPE_COMPOSE_OVERRIDE"
@@ -171,6 +179,7 @@ class StackInspector:
         self.repo_root = repo_root
         self.monitoring_dir = repo_root / "monitoring"
         self.override_path = self.monitoring_dir / OVERRIDE_NAME
+        self.host_model_cache = HOST_MODEL_CACHE
 
     def env_value(self, key: str) -> str:
         """Read one variable from monitoring/.env.
@@ -455,6 +464,56 @@ class StackInspector:
                 f"{EXPECTED_WEIGHTS_SHA256}")
         return f"{WEIGHTS_FILE} sha256 matches (hashed in {elapsed:.1f} s)"
 
+    def client_tokenizer(self) -> str:
+        """Check the tokenizer AIPerf will load on the host.
+
+        The host's refs/main must name the locked revision, and its tokenizer
+        files must be byte-identical to those in the model cache volume.
+
+        Returns:
+            A short description of what matched.
+
+        Raises:
+            RunError: Listing every problem found.
+        """
+        conflicts = [name for name in CLIENT_CONFLICT_VARS if os.environ.get(name)]
+        if conflicts:
+            raise RunError(
+                f"unset {', '.join(conflicts)}: it would change which tokenizer "
+                "AIPerf loads")
+        problems: list[str] = []
+        refs = self.host_model_cache / "refs" / "main"
+        if not refs.is_file():
+            problems.append("host refs/main is missing")
+        else:
+            found = refs.read_text().strip()
+            if found != EXPECTED_MODEL_REVISION:
+                problems.append(
+                    f"host refs/main is {found}, expected {EXPECTED_MODEL_REVISION}")
+
+        image = self.vllm_image()
+        snapshot = self.host_model_cache / "snapshots" / EXPECTED_MODEL_REVISION
+        for name in TOKENIZER_FILES:
+            local = snapshot / name
+            if not local.is_file():
+                problems.append(f"host file missing: {name}")
+                continue
+            result = self.read_model_cache(
+                image, "sha256sum", [], f"{SNAPSHOT_DIR}/{name}")
+            if result.returncode != 0:
+                problems.append(
+                    f"volume file unreadable: {name} {result.stderr.strip()}")
+                continue
+            in_volume = (result.stdout.split() or [""])[0]
+            on_host = hashlib.sha256(local.read_bytes()).hexdigest()
+            if on_host != in_volume:
+                problems.append(
+                    f"{name} differs: host {on_host}, volume {in_volume or 'none'}")
+        if problems:
+            raise RunError("; ".join(problems))
+        return (f"host refs/main is {EXPECTED_MODEL_REVISION}; "
+                f"{len(TOKENIZER_FILES)} tokenizer files match the volume")
+
     def running_stack(self) -> str:
         """Check that a vllm container that is already running is locked.
 
@@ -603,6 +662,8 @@ class RunController:
                 ("override sha256", self.inspector.override_sha256()),
                 ("model revision", EXPECTED_MODEL_REVISION),
                 ("offline", OFFLINE_SETTING),
+                ("client tokenizer",
+                 f"{OFFLINE_SETTING}, revision {EXPECTED_MODEL_REVISION}"),
             ]
         except RunError as exc:
             if not dry_run:
@@ -632,12 +693,16 @@ class RunController:
         return plan
 
     def locked_env(self) -> dict[str, str]:
-        """Environment that makes stack_up.sh load the local override.
+        """Environment that locks both the server and the client.
 
-        run_experiment.sh passes it on when it calls stack_up.sh itself.
+        stack_up.sh loads the local override. The replay, and so AIPerf, runs
+        offline with the locked tokenizer revision. run_experiment.sh passes
+        both on to the scripts it calls.
         """
         return {**os.environ,
-                OVERRIDE_ENV_VAR: str(self.inspector.override_path)}
+                OVERRIDE_ENV_VAR: str(self.inspector.override_path),
+                "HF_HUB_OFFLINE": "1",
+                "TOKENIZER_REVISION": EXPECTED_MODEL_REVISION}
 
     @staticmethod
     def show_plan(plan: Sequence[tuple[str, str]]) -> None:
@@ -790,6 +855,7 @@ class RunController:
         check("compose drift", inspector.compose_drift)
         check("model snapshot", inspector.model_snapshot)
         check("model weights", inspector.model_weights)
+        check("client tokenizer", inspector.client_tokenizer)
         check("running stack", inspector.running_stack)
         return results
 
