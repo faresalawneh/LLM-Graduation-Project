@@ -53,6 +53,17 @@ TOKENIZER_FILES = (
 # Any of these would make AIPerf load something other than what is checked.
 CLIENT_CONFLICT_VARS = (
     "TOKENIZER", "HF_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE")
+# The reader patch that aiperf_trace_replay.py loads into AIPerf.
+HOOK_RELATIVE = Path("monitoring/scripts/aiperf_hooks/sitecustomize.py")
+REQUIRED_AIPERF_VERSION = "0.11.0"
+# Run by AIPerf's interpreter with the hook on PYTHONPATH.
+HOOK_PROBE = (
+    "import importlib.metadata as m; "
+    "from aiperf.dataset import memory_map_utils as u; "
+    "print(m.version('aiperf'), getattr("
+    "u.MemoryMapDatasetClient.get_conversation, '_inferscope_patch', False))")
+# run_experiment.sh activates this environment if aiperf is not on PATH.
+DEFAULT_AIPERF_VENV = Path.home() / "venvs/aiperf-env"
 OVERRIDE_NAME = "docker-compose.local.yml"
 # stack_up.sh layers the override only when this variable names it.
 OVERRIDE_ENV_VAR = "INFERSCOPE_COMPOSE_OVERRIDE"
@@ -105,6 +116,7 @@ class Shell:
 
     def capture(
         self, tool: str, *args: str, timeout: int = 60,
+        env: Optional[dict[str, str]] = None,
     ) -> subprocess.CompletedProcess:
         """Run a short command and capture its output.
 
@@ -112,6 +124,7 @@ class Shell:
             tool: Executable name.
             *args: Arguments passed as a list.
             timeout: Seconds to wait.
+            env: Environment to use instead of the current one.
 
         Returns:
             The completed process, whatever its exit code.
@@ -123,7 +136,7 @@ class Shell:
         try:
             return subprocess.run(  # nosec B603 - list argv, no shell
                 argv, capture_output=True, text=True, timeout=timeout,
-                check=False,
+                check=False, env=env,
             )
         except (subprocess.SubprocessError, OSError) as exc:
             raise RunError(f"could not run {tool}: {exc}") from exc
@@ -514,6 +527,53 @@ class StackInspector:
         return (f"host refs/main is {EXPECTED_MODEL_REVISION}; "
                 f"{len(TOKENIZER_FILES)} tokenizer files match the volume")
 
+    def aiperf_python(self) -> str:
+        """Return the interpreter of the aiperf that a run would start.
+
+        Raises:
+            RunError: If aiperf or its interpreter cannot be determined.
+        """
+        executable = shutil.which("aiperf")
+        if executable is None:
+            venv = Path(os.environ.get("AIPERF_VENV") or DEFAULT_AIPERF_VENV)
+            executable = str(venv / "bin" / "aiperf")
+        try:
+            with open(executable, "rb") as handle:
+                first = handle.readline().decode("utf-8", errors="replace").strip()
+        except OSError as exc:
+            raise RunError(f"aiperf not found at {executable}: {exc}") from exc
+        if not first.startswith("#!") or "python" not in first:
+            raise RunError(
+                f"cannot tell which Python runs {executable} (first line {first!r})")
+        return first[2:].strip()
+
+    def aiperf_hook(self) -> str:
+        """Check that the reader patch loads into AIPerf's own interpreter.
+
+        Raises:
+            RunError: If the hook is missing, refuses to load, or AIPerf is not
+                the version it is written for.
+        """
+        hook = self.repo_root / HOOK_RELATIVE
+        if not hook.is_file():
+            raise RunError(f"reader patch missing: {HOOK_RELATIVE}")
+        python = self.aiperf_python()
+        with tempfile.TemporaryDirectory() as scratch:
+            env = {**os.environ, "PYTHONPATH": str(hook.parent),
+                   "AIPERF_PATCH_STATUS_FILE": str(Path(scratch) / "status.jsonl"),
+                   "PYTHONDONTWRITEBYTECODE": "1"}
+            result = self.shell.capture(
+                python, "-c", HOOK_PROBE, env=env, timeout=120)
+        found = result.stdout.split()
+        if result.returncode != 0 or found != [REQUIRED_AIPERF_VERSION, "True"]:
+            raise RunError(
+                f"reader patch did not load into {python} (exit "
+                f"{result.returncode}, reported {found or 'nothing'}) "
+                f"{result.stderr.strip()[-300:]}".strip())
+        digest = hashlib.sha256(hook.read_bytes()).hexdigest()
+        return (f"aiperf {REQUIRED_AIPERF_VERSION}; reader patch loads, "
+                f"sha256 {digest}")
+
     def running_stack(self) -> str:
         """Check that a vllm container that is already running is locked.
 
@@ -856,6 +916,7 @@ class RunController:
         check("model snapshot", inspector.model_snapshot)
         check("model weights", inspector.model_weights)
         check("client tokenizer", inspector.client_tokenizer)
+        check("AIPerf patch", inspector.aiperf_hook)
         check("running stack", inspector.running_stack)
         return results
 

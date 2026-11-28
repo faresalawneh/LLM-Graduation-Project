@@ -28,6 +28,8 @@ except ImportError as exc:  # pragma: no cover
         "    pip install -r requirements-experiments.txt"
     ) from exc
 
+from aiperf_patch_status import STATUS_NAME, read_patch_status
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger("mlflow_log_run")
 
@@ -46,6 +48,8 @@ PROVENANCE_KEYS = (
     "trace_original_path", "trace_original_sha256",
     "client_hf_hub_offline", "client_tokenizer_revision",
 )
+# Written by aiperf_trace_replay.py into the run directory.
+GUARD_REPORT_FILE = "stall_guard.json"
 # Written to stack_state.json by stack_up.sh about the vllm container it started.
 VERSION_LOCK_KEYS = (
     "override_active", "override_sha256", "model_revision",
@@ -143,6 +147,37 @@ def run_provenance(
     params: dict[str, str] = {}
     for key, value in found.items():
         if value in (None, "", UNAVAILABLE):
+            log.warning("%s unavailable; logging it as such", key)
+            value = UNAVAILABLE
+        params[key] = str(value)
+    return params
+
+
+def client_provenance(run_dir: Path) -> dict[str, str]:
+    """Params describing the AIPerf reader patch and the stall guard.
+
+    Args:
+        run_dir: The run's artifact directory.
+
+    Returns:
+        Every param, with "unavailable" for any value that was not recorded.
+    """
+    patch = read_patch_status(run_dir / STATUS_NAME)
+    path = run_dir / GUARD_REPORT_FILE
+    guard = read_json(path) if path.is_file() else {}
+    fired = guard.get("guard_fired")
+    found = {
+        "aiperf_version": patch["aiperf_version"],
+        "aiperf_patch_active": patch["active"],
+        "aiperf_patch_sha256": patch["hook_sha256"],
+        "stall_guard_seconds": guard.get("stall_guard_seconds"),
+        "guard_fired": str(fired).lower() if isinstance(fired, bool) else None,
+    }
+    if patch["problem"]:
+        log.warning("%s", patch["problem"])
+    params: dict[str, str] = {}
+    for key, value in found.items():
+        if value is None:
             log.warning("%s unavailable; logging it as such", key)
             value = UNAVAILABLE
         params[key] = str(value)
@@ -269,6 +304,7 @@ def main() -> int:
             "stack_env": stack_env,
         }
         params.update(run_provenance(manifest, stack))
+        params.update(client_provenance(run_dir))
         mlflow.log_params({k: v for k, v in params.items() if v is not None})
 
         metrics = parse_aiperf_csv(run_dir / "profile_export_aiperf.csv")

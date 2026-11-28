@@ -337,12 +337,14 @@ model volume, and MLflow records both client values.
 `--type` and `--up` first require every preflight check to pass: clean git tree,
 GPU, `VLLM_IMAGE`, Grafana password, vLLM image pulled and at the locked digest,
 the override's lock, no drift between the override and `docker-compose.yml`, the
-model snapshot and weights hash, and, if vLLM is already running, that it was
-started locked. They then print a plan and continue only if you type
+model snapshot and weights hash, that the AIPerf reader patch loads, and, if vLLM
+is already running, that it was started locked. They then print a plan and continue only if you type
 exactly `yes`. There is no bypass flag, and `yes` cannot override a failed
 check. With `--runs`, the checks are repeated before each later run. `--type` calls `run_experiment.sh`, so a run starts the
 stack if it is not already up. Starting the stack pulls any other missing
 compose image and builds `nvml-exporter`.
+
+**Client patch:** runs load `monitoring/scripts/aiperf_hooks/` into AIPerf 0.11.0 only (installed package unedited) because a race in its dataset reader (shared memory-map cursor) fails requests and then stalls the run (evidence folder `T5-31`); a stall guard interrupts such a stall after 120 s, and a run where it fires, or the patch is not verified, exits 86 as invalid.
 
 Preflight needs the model already in the `monitoring_hf_cache` volume. It may
 start short-lived containers from the already pulled vLLM image, with no GPU and

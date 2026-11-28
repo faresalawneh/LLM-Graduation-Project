@@ -106,7 +106,14 @@ fi
 
 step "running: ${SCENARIO}"
 START_EPOCH="$(date +%s)"
-( cd "${SCRIPTS}" && ./run_local_replay.sh "${REPLAY_ARG}" )
+# 86 is aiperf_trace_replay.py's INVALID_RUN_EXIT: the run finished but must not
+# be used. It is still logged and checked, and this script then exits with 86.
+INVALID_RUN_EXIT=86
+REPLAY_RC=0
+( cd "${SCRIPTS}" && ./run_local_replay.sh "${REPLAY_ARG}" ) || REPLAY_RC=$?
+if [ "${REPLAY_RC}" -ne 0 ] && [ "${REPLAY_RC}" -ne "${INVALID_RUN_EXIT}" ]; then
+  exit "${REPLAY_RC}"
+fi
 ELAPSED=$(( $(date +%s) - START_EPOCH ))
 
 RUN_DIR="$(ls -dt "${ARTIFACT_ROOT}"/${PREFIX}_*/ 2>/dev/null | head -1 || true)"
@@ -159,3 +166,8 @@ fi
 
 echo
 echo "view results:  ${MON_DIR}/mlflow_ui.sh"
+
+if [ "${REPLAY_RC}" -ne 0 ]; then
+  echo "*** RUN INVALID (exit ${REPLAY_RC}): see ${RUN_DIR}stall_guard.json ***" >&2
+  exit "${REPLAY_RC}"
+fi

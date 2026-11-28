@@ -44,6 +44,7 @@ class FakeSystem:
             "Env": BASE_ENV + ["HF_HUB_OFFLINE=1"],
         }
         self.script_exit_codes = []
+        self.hook_exit_code = 0
 
     def __call__(self, argv, **kwargs):
         tool = argv[0].rsplit("/", 1)[-1]
@@ -94,6 +95,9 @@ class FakeSystem:
                     out = f"{self.weights}  {args[-1]}\n"
             elif not self.snapshot:
                 code = 1
+        elif tool == "python3" and args[:1] == ["-c"]:  # the reader patch probe
+            code = self.hook_exit_code
+            out = "" if code else "0.11.0 True\n"
         elif tool == "bash" and self.script_exit_codes:
             code = self.script_exit_codes.pop(0)
         elif tool == "pkill":
@@ -116,6 +120,8 @@ def system(monkeypatch):
     monkeypatch.setattr(start_run.subprocess, "run", fake)
     monkeypatch.setattr(start_run.shutil, "which", lambda tool: f"/usr/bin/{tool}")
     monkeypatch.setattr(start_run.StackInspector, "api_answering", lambda self: False)
+    monkeypatch.setattr(start_run.StackInspector, "aiperf_python",
+                        lambda self: "/venv/bin/python3")
     for name in ("VLLM_IMAGE", "STACK_ENV", "MAX_CONCURRENCY", "HF_HUB_OFFLINE",
                  "TOKENIZER_REVISION", *start_run.CLIENT_CONFLICT_VARS,
                  start_run.OVERRIDE_ENV_VAR):
@@ -137,6 +143,9 @@ def repo(tmp_path, monkeypatch):
     (tmp_path / "hostcache" / "refs" / "main").write_text(REV)
     (tmp_path / "monitoring").mkdir()
     (tmp_path / "monitoring" / start_run.OVERRIDE_NAME).write_bytes(OVERRIDE_TEXT)
+    hook = tmp_path / start_run.HOOK_RELATIVE
+    hook.parent.mkdir(parents=True)
+    hook.write_text("# stand-in for the reader patch\n")
     write_env(tmp_path, f"VLLM_IMAGE={IMAGE}\nGRAFANA_ADMIN_PASSWORD={SECRET}\n")
     return tmp_path
 
@@ -257,6 +266,7 @@ BLOCKERS = {
     "model weights": ({"weights": "0" * 64}, None),
     "client tokenizer": (
         {"volume_files": {**HOST_TOKENIZER, "vocab.json": b"other"}}, None),
+    "AIPerf patch": ({"hook_exit_code": 78}, None),
     "running stack": ({"running": IMAGE, "container_config": UNLOCKED}, None),
 }
 

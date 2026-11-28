@@ -27,7 +27,7 @@ jobs:
       - name: Run Pytest
         env:
           PYTHONPATH: api
-        run: pytest api/test_app.py api/test_auth.py monitoring/exporters/test_nvml_exporter.py monitoring/scripts/test_start_run.py monitoring/scripts/test_run_local_replay.py monitoring/scripts/test_mlflow_log_run.py monitoring/test_stack_up.py monitoring/scripts/test_aiperf_trace_replay.py -v
+        run: pytest api/test_app.py api/test_auth.py monitoring/exporters/test_nvml_exporter.py monitoring/scripts/test_start_run.py monitoring/scripts/test_run_local_replay.py monitoring/scripts/test_mlflow_log_run.py monitoring/test_stack_up.py monitoring/scripts/test_aiperf_trace_replay.py monitoring/scripts/test_aiperf_hook.py -v
       - name: Run Postman collection (Newman)
         working-directory: api
         env:
@@ -41,7 +41,7 @@ jobs:
           npx --yes newman@6 run postman/llm-observability-api.postman_collection.json \
             -e postman/local.postman_environment.json --bail
       - name: Run Security Scan
-        run: bandit -r api monitoring -x api/test_app.py,api/test_auth.py,api/conftest.py,monitoring/exporters/test_nvml_exporter.py,monitoring/scripts/test_start_run.py,monitoring/scripts/test_run_local_replay.py,monitoring/scripts/test_mlflow_log_run.py,monitoring/test_stack_up.py,monitoring/scripts/test_aiperf_trace_replay.py
+        run: bandit -r api monitoring -x api/test_app.py,api/test_auth.py,api/conftest.py,monitoring/exporters/test_nvml_exporter.py,monitoring/scripts/test_start_run.py,monitoring/scripts/test_run_local_replay.py,monitoring/scripts/test_mlflow_log_run.py,monitoring/test_stack_up.py,monitoring/scripts/test_aiperf_trace_replay.py,monitoring/scripts/test_aiperf_hook.py
 
       - name: Validate Prometheus config
         run: |
